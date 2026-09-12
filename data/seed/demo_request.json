@@ -1,0 +1,11 @@
+{
+  "household_id": "household_rivera",
+  "event_ids": [
+    "event_school_celebration",
+    "event_festive_dinner",
+    "event_coastal_outing"
+  ],
+  "user_message": "Plan outfits for our family for the school celebration, Diwali dinner, and coastal outing. Use what we own first, coordinate our looks without making us identical, and keep any suggested purchases under $100 total.",
+  "purchase_budget": 100
+}
+

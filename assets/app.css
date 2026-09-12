@@ -1,0 +1,42 @@
+:root { --leaf: #355941; --ink: #293e33; --muted: #627063; --paper: #fffefa; --line: #dedfd5; }
+[data-testid="stAppViewContainer"], [data-testid="stHeader"] { background: #f8f6f1; color: var(--ink); }
+.block-container { max-width: 1200px; padding: 4.5rem 2rem 2rem; }
+h1, h2, h3 { color: var(--ink); }
+h1, h2, h3 { font-family: Georgia, 'Times New Roman', serif !important; font-weight: 400 !important; letter-spacing: -.035em; }
+h1 { font-size: clamp(2rem, 4vw, 3.4rem) !important; line-height: 1.12 !important; padding-bottom: .8rem !important; }
+h2 { font-size: 1.8rem !important; }
+.brand { font: 30px Georgia, serif; letter-spacing: -1px; padding: 5px 0 18px; }
+.brand span { color: #84947b; }
+.household { display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding-top: 5px; font-size: 14px; }
+.avatar { display: inline-grid; place-items: center; flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; background: #e7eddf; color: var(--leaf); font-weight: 600; }
+.eyebrow { color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: 1.7px; font-weight: 600; padding-top: 6px; }
+.st-key-page [role="radiogroup"] { gap: 6px; flex-wrap: wrap; }
+.st-key-page [data-testid="stRadioOption"] { margin: 0; padding: 9px 16px; border-radius: 999px; color: var(--muted); cursor: pointer; min-height: 44px; }
+/* Hide only the decorative radio circle; preserve the native input and keyboard support. */
+.st-key-page [data-testid="stRadioOption"] > div > div > div:not([data-testid="stMarkdownContainer"]) { display: none; }
+.st-key-page [data-testid="stRadioOption"]:hover { background: #eeeee5; color: var(--ink); }
+.st-key-page [data-testid="stRadioOption"]:has(input:checked) { background: #e7eddf; color: var(--ink); }
+.st-key-page [data-testid="stRadioOption"]:has(input:focus-visible) { outline: 2px solid var(--leaf); outline-offset: 3px; }
+.st-key-page { border-bottom: 1px solid var(--line); padding-bottom: 15px; margin-bottom: 22px; }
+[data-testid="stButton"] button { border: 1px solid var(--line); border-radius: 9px; background: var(--paper); color: var(--ink); min-height: 44px; }
+[data-testid="stButton"] button[kind="primary"] { background: var(--leaf); color: white; border-color: var(--leaf); }
+[data-testid="stButton"] button:hover { border-color: var(--leaf); background: #e7eddf; color: var(--ink); }
+[data-testid="stButton"] button:focus-visible { outline: 3px solid #71936b; outline-offset: 3px; }
+[data-testid="stVerticalBlockBorderWrapper"] > div { border-color: var(--line) !important; border-radius: 14px !important; }
+[data-testid="stVerticalBlockBorderWrapper"]:has(.person-heading), [data-testid="stVerticalBlockBorderWrapper"]:has(.garment-stage) { background: var(--paper); border-radius: 14px; }
+.st-key-occasion { background: #e8edde; padding: 28px; border-radius: 16px; margin: 14px 0 24px; }
+.person-heading { display: flex; align-items: center; gap: 12px; }
+.person-heading h3 { font: 600 20px Arial, sans-serif; margin: 0; padding: 0; }
+.muted { color: var(--muted); font-size: 13px; }
+.swatches { display: flex; gap: 7px; margin-top: 15px; }
+.swatches span { height: 19px; width: 19px; border-radius: 50%; border: 1px solid #8885; }
+.hero-art { display: flex; justify-content: center; gap: 14px; padding: 30px 0; }
+.garment-stage { background: #edf0e6; min-height: 150px; display: grid; place-items: center; padding: 20px; border-radius: 10px; }
+.hero-art .garment-stage { background: transparent; padding: 6px; }
+.garment { width: 95px; height: 115px; background: var(--fabric); filter: drop-shadow(0 6px 5px #0002); }
+.garment.top, .garment.outerwear { clip-path: polygon(27% 4%,40% 0,44% 9%,56% 9%,60% 0,73% 4%,100% 29%,80% 43%,72% 32%,75% 100%,25% 100%,28% 32%,20% 43%,0 29%); }
+.garment.bottom { clip-path: polygon(18% 0,82% 0,94% 100%,57% 100%,50% 38%,43% 100%,6% 100%); }
+.garment.one_piece { clip-path: polygon(32% 0,44% 0,46% 11%,54% 11%,56% 0,68% 0,64% 35%,91% 100%,9% 100%,36% 35%); }
+.garment.footwear { height: 65px; clip-path: polygon(0 12%,30% 12%,35% 45%,68% 61%,100% 65%,100% 95%,0 95%); }
+.garment.accessory { height: 90px; border-radius: 50%; background: transparent; border: 14px solid var(--fabric); }
+@media (max-width: 640px) { .block-container { padding: 4rem 1rem 1.5rem; } .st-key-occasion { padding: 20px; } .household { justify-content: flex-start; } .hero-art { padding: 12px 0; } .garment { width: 70px; height: 95px; } }

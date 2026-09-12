@@ -1,0 +1,63 @@
+[
+  {
+    "id": "guide_smart_casual_school",
+    "title": "Smart-casual family school events",
+    "source": "Prototype reviewed guidance v1",
+    "text": "For a school community event, favor polished separates, comfortable footwear, and one removable layer. Coordinate the family through a shared neutral or repeated accent color rather than identical outfits.",
+    "event_types": ["school celebration"],
+    "dress_codes": ["smart_casual"],
+    "season_tags": ["fall"],
+    "audience_tags": ["family", "adult", "child"]
+  },
+  {
+    "id": "guide_festive_family",
+    "title": "Coordinating festive family outfits",
+    "source": "Prototype reviewed guidance v1",
+    "text": "For a festive family dinner, select a small shared palette and vary the dominant color by person. Traditional pieces can be coordinated through complementary jewel tones, cream, and one repeated accent while preserving each person's comfort preferences.",
+    "event_types": ["family festival dinner"],
+    "dress_codes": ["festive"],
+    "season_tags": ["fall"],
+    "audience_tags": ["family", "adult", "child"]
+  },
+  {
+    "id": "guide_coastal_layers",
+    "title": "Layering for a cool coastal outing",
+    "source": "Prototype reviewed guidance v1",
+    "text": "For a cool coastal outing, use breathable base layers, a warm removable layer, walking shoes, and a packable rain-resistant outer layer when showers are possible. Avoid footwear that becomes uncomfortable over several hours.",
+    "event_types": ["weekend outdoor outing"],
+    "dress_codes": ["casual"],
+    "season_tags": ["fall"],
+    "audience_tags": ["family", "walking", "travel"]
+  },
+  {
+    "id": "guide_purchase_reuse",
+    "title": "Prioritizing wardrobe-gap purchases",
+    "source": "Prototype reviewed guidance v1",
+    "text": "When a purchase is necessary, prefer an item that completes more than one planned outfit, coordinates with several owned pieces, stays within budget, and fills a recurring functional gap such as rain protection or comfortable formal footwear.",
+    "event_types": ["any"],
+    "dress_codes": ["casual", "smart_casual", "formal", "festive"],
+    "season_tags": ["all"],
+    "audience_tags": ["family", "shopping"]
+  },
+  {
+    "id": "guide_child_comfort",
+    "title": "Comfort-first children's event clothing",
+    "source": "Prototype reviewed guidance v1",
+    "text": "Children's event outfits should allow sitting, walking, and active play. Favor soft fabrics, secure footwear, simple layers, and accessories that do not restrict movement.",
+    "event_types": ["school celebration", "family festival dinner", "weekend outdoor outing"],
+    "dress_codes": ["casual", "smart_casual", "festive"],
+    "season_tags": ["all"],
+    "audience_tags": ["child"]
+  },
+  {
+    "id": "guide_repeat_balance",
+    "title": "Balancing outfit reuse across events",
+    "source": "Prototype reviewed guidance v1",
+    "text": "Reuse versatile footwear, outerwear, and neutral separates across events when appropriate. Preserve variety by changing a top, accent color, or accessory, and respect each person's stated willingness to repeat clothing.",
+    "event_types": ["multi-event planning"],
+    "dress_codes": ["casual", "smart_casual", "festive"],
+    "season_tags": ["all"],
+    "audience_tags": ["family"]
+  }
+]
+

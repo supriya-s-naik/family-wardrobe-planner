@@ -1,0 +1,6 @@
+[
+  {"key":"weather_school","condition":"partly cloudy","high_f":76,"low_f":57,"precipitation_probability":10,"wind_mph":8,"source":"seeded"},
+  {"key":"weather_dinner","condition":"clear evening","high_f":72,"low_f":52,"precipitation_probability":5,"wind_mph":4,"source":"seeded"},
+  {"key":"weather_outing","condition":"cool with possible showers","high_f":64,"low_f":53,"precipitation_probability":55,"wind_mph":14,"source":"seeded"}
+]
+

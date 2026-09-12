@@ -1,0 +1,45 @@
+[
+  {
+    "id": "event_school_celebration",
+    "household_id": "household_rivera",
+    "name": "School Community Celebration",
+    "date": "2026-09-18",
+    "location": "San Jose, California",
+    "participant_ids": ["member_maya", "member_arjun", "member_anaya"],
+    "event_type": "school celebration",
+    "dress_code": "smart_casual",
+    "setting": "mixed",
+    "activities": ["classroom visit", "family photos", "standing reception"],
+    "weather_key": "weather_school",
+    "notes": "Polished but approachable; comfortable for two hours of standing."
+  },
+  {
+    "id": "event_festive_dinner",
+    "household_id": "household_rivera",
+    "name": "Diwali Family Dinner",
+    "date": "2026-10-20",
+    "location": "Fremont, California",
+    "participant_ids": ["member_maya", "member_arjun", "member_anaya"],
+    "event_type": "family festival dinner",
+    "dress_code": "festive",
+    "setting": "indoor",
+    "activities": ["family meal", "photos", "light celebration"],
+    "weather_key": "weather_dinner",
+    "notes": "The family wants coordinated jewel tones without identical outfits."
+  },
+  {
+    "id": "event_coastal_outing",
+    "household_id": "household_rivera",
+    "name": "Santa Cruz Coastal Outing",
+    "date": "2026-09-20",
+    "location": "Santa Cruz, California",
+    "participant_ids": ["member_maya", "member_arjun", "member_anaya"],
+    "event_type": "weekend outdoor outing",
+    "dress_code": "casual",
+    "setting": "outdoor",
+    "activities": ["walking", "picnic", "boardwalk"],
+    "weather_key": "weather_outing",
+    "notes": "Expect several hours of walking and changing coastal conditions."
+  }
+]
+

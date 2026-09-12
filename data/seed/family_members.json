@@ -1,0 +1,42 @@
+[
+  {
+    "id": "member_maya",
+    "household_id": "household_rivera",
+    "name": "Maya",
+    "age_group": "adult",
+    "sizes": {"top": "M", "bottom": "8", "shoe": "8"},
+    "preferred_colors": ["teal", "navy", "burgundy"],
+    "avoided_colors": ["neon green"],
+    "avoided_styles": ["high heels"],
+    "comfort_needs": ["prefers flats for extended walking", "likes light layers"],
+    "cultural_preferences": ["enjoys Indian festive wear for family celebrations"],
+    "repeat_tolerance": "medium"
+  },
+  {
+    "id": "member_arjun",
+    "household_id": "household_rivera",
+    "name": "Arjun",
+    "age_group": "adult",
+    "sizes": {"top": "L", "bottom": "34", "shoe": "10"},
+    "preferred_colors": ["navy", "olive", "white"],
+    "avoided_colors": ["bright orange"],
+    "avoided_styles": ["skinny fit"],
+    "comfort_needs": ["prefers breathable fabrics", "needs comfortable walking shoes"],
+    "cultural_preferences": ["enjoys Indian festive wear for family celebrations"],
+    "repeat_tolerance": "high"
+  },
+  {
+    "id": "member_anaya",
+    "household_id": "household_rivera",
+    "name": "Anaya",
+    "age_group": "child",
+    "sizes": {"top": "8", "bottom": "8", "shoe": "2"},
+    "preferred_colors": ["coral", "purple", "blue"],
+    "avoided_colors": [],
+    "avoided_styles": ["itchy sequins"],
+    "comfort_needs": ["soft fabrics", "clothes must allow active play"],
+    "cultural_preferences": ["festive outfits should remain easy to move in"],
+    "repeat_tolerance": "low"
+  }
+]
+

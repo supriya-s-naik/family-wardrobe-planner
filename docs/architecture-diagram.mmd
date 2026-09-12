@@ -1,0 +1,58 @@
+flowchart LR
+    U[Household organizer]
+
+    subgraph APP[Wardrobe Planner application]
+        UI[Streamlit interface]
+
+        subgraph GRAPH[LangGraph orchestration]
+            INTAKE[1. Intake and normalize request]
+            CONTEXT[2. Gather planning context]
+            PLAN[3. Outfit planning agent]
+            VALIDATE[4. Deterministic validator]
+            REPAIR[5. Repair invalid plan]
+            PRESENT[6. Rank and present plan]
+
+            INTAKE --> CONTEXT --> PLAN --> VALIDATE
+            VALIDATE -->|Valid| PRESENT
+            VALIDATE -->|Errors and retries remain| REPAIR --> PLAN
+            VALIDATE -->|Retry limit reached| PRESENT
+        end
+
+        TOOLS[Typed tool layer]
+        SCHEMAS[Pydantic schemas and policy rules]
+    end
+
+    subgraph AI[AI services]
+        NEBIUS[Nebius Token Factory<br/>open-weight planning model]
+        PINECONE[Pinecone<br/>style-guidance RAG]
+        MEM0[Mem0<br/>cross-session preferences]
+    end
+
+    subgraph DATA[Authoritative and contextual data]
+        SQLITE[(SQLite<br/>family, wardrobe, events, plans)]
+        WEATHER[Weather adapter<br/>live or seeded]
+        CATALOG[Curated sample catalog]
+        DOCS[Reviewed guidance documents]
+    end
+
+    OBS[LangSmith<br/>traces and evaluations]
+
+    U -->|Profiles, events, requests, feedback| UI
+    UI -->|Planning request| INTAKE
+    PRESENT -->|Outfit plan, evidence, warnings| UI
+    CONTEXT <--> TOOLS
+    PLAN <--> TOOLS
+    PLAN <--> NEBIUS
+    VALIDATE <--> SCHEMAS
+
+    TOOLS <--> SQLITE
+    TOOLS <--> PINECONE
+    TOOLS <--> MEM0
+    TOOLS <--> WEATHER
+    TOOLS <--> CATALOG
+    DOCS -->|Ingestion before demo| PINECONE
+
+    INTAKE -.->|Run events| OBS
+    VALIDATE -.->|Validation events| OBS
+    TOOLS -.->|Tool traces| OBS
+    NEBIUS -.->|Model traces| OBS

@@ -1,0 +1,9 @@
+[
+  {"id":"catalog_01","name":"Packable teal rain shell","category":"outerwear","intended_age_group":"adult","color":"teal","price":58,"formality":"casual","compatible_colors":["navy","cream","white","gray"],"occasion_tags":["outing","travel","rain"]},
+  {"id":"catalog_02","name":"Child packable rain shell","category":"outerwear","intended_age_group":"child","color":"navy","price":38,"formality":"casual","compatible_colors":["coral","purple","blue","cream"],"occasion_tags":["outing","school","rain"]},
+  {"id":"catalog_03","name":"Burgundy embroidered flats","category":"footwear","intended_age_group":"adult","color":"burgundy","price":72,"formality":"festive","compatible_colors":["teal","cream","navy","gold"],"occasion_tags":["festival","family_dinner"]},
+  {"id":"catalog_04","name":"Neutral lightweight cardigan","category":"outerwear","intended_age_group":"adult","color":"oatmeal","price":46,"formality":"smart_casual","compatible_colors":["navy","teal","burgundy","olive"],"occasion_tags":["school","work","dinner","travel"]},
+  {"id":"catalog_05","name":"Gold festive waistcoat","category":"outerwear","intended_age_group":"adult","color":"gold","price":65,"formality":"festive","compatible_colors":["navy","cream","burgundy"],"occasion_tags":["festival","wedding","family_dinner"]},
+  {"id":"catalog_06","name":"Water-resistant family tote","category":"accessory","intended_age_group":"any","color":"navy","price":34,"formality":"casual","compatible_colors":["teal","coral","olive","gray"],"occasion_tags":["outing","travel","school"]}
+]
+
