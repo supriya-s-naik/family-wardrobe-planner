@@ -9,7 +9,7 @@ from wardrobe_planner.data.seed_loader import load_seed_dataset
 from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workflow
 
 ROOT = Path(__file__).resolve().parent
-APP_STATE_VERSION = "retrieval-evidence-v5"
+APP_STATE_VERSION = "background-result-v6"
 st.set_page_config(
     page_title="Everyday / together · Wardrobe Planner", page_icon="🌿", layout="wide"
 )
@@ -45,15 +45,6 @@ def planning_executor():
     return ThreadPoolExecutor(max_workers=2, thread_name_prefix="wardrobe-planner")
 
 
-def has_retrieval_evidence(state):
-    for record in state.get("tool_results", []):
-        if record["name"] == "prepare_planning_context":
-            return bool(record["result"].get("retrieval_metadata", {}).get("provider"))
-        if record["name"] == "search_style_guidance":
-            return all(document.get("retrieval_provider") for document in record["result"])
-    return False
-
-
 @st.fragment(run_every=1)
 def render_planning_progress():
     job = st.session_state.get("planning_job")
@@ -65,14 +56,8 @@ def render_planning_progress():
 
     try:
         planning_state = job.result()
-        if not has_retrieval_evidence(planning_state):
-            st.session_state["planning_error"] = (
-                "An older planning result was discarded because it had no retrieval evidence. "
-                "Please generate the plan again."
-            )
-        else:
-            planning_state["app_state_version"] = APP_STATE_VERSION
-            st.session_state["planning_state"] = planning_state
+        planning_state["app_state_version"] = APP_STATE_VERSION
+        st.session_state["planning_state"] = planning_state
     except Exception:  # noqa: BLE001 -- Background failures stay inside the UI boundary.
         st.session_state["planning_error"] = (
             "Planning couldn’t finish. Please try again or choose Demo-safe local in Planning options."
@@ -222,10 +207,6 @@ page = st.radio(
     label_visibility="collapsed",
     key="page",
 )
-if st.session_state.get("planning_job") is not None:
-    render_planning_progress()
-if planning_error := st.session_state.pop("planning_error", None):
-    st.error(planning_error)
 
 if page == "Overview":
     heading, action = st.columns([3, 1], vertical_alignment="center")
@@ -396,13 +377,15 @@ else:
         runner = run_nebius_workflow if backend == "Nebius live" else run_demo_workflow
         st.session_state["planning_job"] = planning_executor().submit(runner, request_dataset)
         st.rerun()
+    if st.session_state.get("planning_job") is not None:
+        render_planning_progress()
+    if planning_error := st.session_state.pop("planning_error", None):
+        st.error(planning_error)
     planning_state = st.session_state.get("planning_state")
     if planning_state:
-        if planning_state.get(
-            "app_state_version"
-        ) != APP_STATE_VERSION or not has_retrieval_evidence(planning_state):
+        if planning_state.get("app_state_version") != APP_STATE_VERSION:
             st.session_state.pop("planning_state", None)
-            st.info("The previous plan used an older retrieval format. Generate it again.")
+            st.info("The app was updated. Generate a fresh plan to continue.")
         else:
             request = planning_state["request"]
             if request["event_ids"] == selected_events and request["purchase_budget"] == budget:
