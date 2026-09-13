@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from html import escape
 from pathlib import Path
@@ -8,7 +9,7 @@ from wardrobe_planner.data.seed_loader import load_seed_dataset
 from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workflow
 
 ROOT = Path(__file__).resolve().parent
-APP_STATE_VERSION = "event-specific-rag-v3"
+APP_STATE_VERSION = "background-planning-v4"
 st.set_page_config(
     page_title="Everyday / together · Wardrobe Planner", page_icon="🌿", layout="wide"
 )
@@ -16,6 +17,8 @@ st.html(f"<style>{(ROOT / 'assets' / 'app.css').read_text(encoding='utf-8')}</st
 dataset = load_seed_dataset(ROOT / "data" / "seed")
 if st.session_state.get("app_state_version") != APP_STATE_VERSION:
     st.session_state.pop("planning_state", None)
+    st.session_state.pop("planning_job", None)
+    st.session_state.pop("planning_error", None)
     st.session_state["app_state_version"] = APP_STATE_VERSION
 member_by_id = {m.id: m for m in dataset.family_members}
 event_by_id = {e.id: e for e in dataset.events}
@@ -35,6 +38,31 @@ COLORS = {
     "brown": "#92715b",
     "cream": "#e5ddc7",
 }
+
+
+@st.cache_resource
+def planning_executor():
+    return ThreadPoolExecutor(max_workers=2, thread_name_prefix="wardrobe-planner")
+
+
+@st.fragment(run_every=1)
+def render_planning_progress():
+    job = st.session_state.get("planning_job")
+    if job is None:
+        return
+    if not job.done():
+        st.info("Building your family plan… You can explore another section while this finishes.")
+        return
+
+    try:
+        st.session_state["planning_state"] = job.result()
+    except Exception:  # noqa: BLE001 -- Background failures stay inside the UI boundary.
+        st.session_state["planning_error"] = (
+            "Planning couldn’t finish. Please try again or choose Demo-safe local in Planning options."
+        )
+    finally:
+        st.session_state.pop("planning_job", None)
+    st.rerun()
 
 
 def navigate(page, event_id=None):
@@ -168,6 +196,10 @@ page = st.radio(
     label_visibility="collapsed",
     key="page",
 )
+if st.session_state.get("planning_job") is not None:
+    render_planning_progress()
+if planning_error := st.session_state.pop("planning_error", None):
+    st.error(planning_error)
 
 if page == "Overview":
     heading, action = st.columns([3, 1], vertical_alignment="center")
@@ -318,8 +350,15 @@ else:
             st.caption(
                 "Live planning usually takes about a minute while the AI builds all family outfits."
             )
-    if st.button("Generate family plan", type="primary", disabled=not selected_events):
+    active_job = st.session_state.get("planning_job")
+    job_running = active_job is not None and not active_job.done()
+    if st.button(
+        "Generate family plan",
+        type="primary",
+        disabled=not selected_events or job_running,
+    ):
         st.session_state.pop("planning_state", None)
+        st.session_state.pop("planning_error", None)
         request_dataset = dataset.model_copy(deep=True)
         request_dataset.demo_request.event_ids = selected_events
         request_dataset.demo_request.purchase_budget = budget
@@ -328,14 +367,9 @@ else:
             + ", ".join(event_by_id[eid].name for eid in selected_events)
             + f". Use owned items first, coordinate without identical outfits, and keep all suggested purchases within ${budget:.0f} total."
         )
-        with st.spinner("Finding pieces that work together for your family…"):
-            try:
-                runner = run_nebius_workflow if backend == "Nebius live" else run_demo_workflow
-                st.session_state["planning_state"] = runner(request_dataset)
-            except Exception:  # noqa: BLE001 -- Keep backend failures inside the UI boundary.
-                st.error(
-                    "Planning couldn’t finish. Please try again or choose Demo-safe local in Planning options."
-                )
+        runner = run_nebius_workflow if backend == "Nebius live" else run_demo_workflow
+        st.session_state["planning_job"] = planning_executor().submit(runner, request_dataset)
+        st.rerun()
     planning_state = st.session_state.get("planning_state")
     if planning_state:
         request = planning_state["request"]

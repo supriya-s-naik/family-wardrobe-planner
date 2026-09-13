@@ -10,6 +10,18 @@ def start():
     return AppTest.from_file(str(APP_PATH)).run(timeout=15)
 
 
+def await_plan(app):
+    try:
+        job = app.session_state["planning_job"]
+    except KeyError:
+        return app
+    try:
+        job.result(timeout=15)
+    except RuntimeError:
+        pass
+    return app.run(timeout=15)
+
+
 def test_overview_and_wardrobe_navigation():
     app = start()
     assert not app.exception
@@ -27,6 +39,7 @@ def test_generate_family_plan_button_completes_workflow():
     app.radio(key="page").set_value("Plan outfits").run()
     app.radio[1].set_value("Demo-safe local").run()
     app.button[0].click().run(timeout=15)
+    app = await_plan(app)
     assert not app.exception
     assert "Your family plan is ready" in app.success[0].value
     assert (
@@ -45,6 +58,7 @@ def test_event_action_scopes_plan_and_empty_selection_is_disabled():
     app.radio[1].set_value("Demo-safe local").run()
     app.number_input[0].set_value(0).run()
     app.button[0].click().run(timeout=15)
+    app = await_plan(app)
     assert not app.exception
     result = app.session_state["planning_state"]["final_result"]
     assert result["status"] == "valid"
@@ -62,5 +76,6 @@ def test_failed_planning_renders_without_empty_columns():
         "wardrobe_planner.workflow.graph.run_demo_workflow", side_effect=RuntimeError("offline")
     ):
         app.button[0].click().run()
+        app = await_plan(app)
     assert not app.exception
     assert app.error
