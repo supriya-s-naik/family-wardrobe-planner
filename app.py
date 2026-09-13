@@ -9,7 +9,7 @@ from wardrobe_planner.data.seed_loader import load_seed_dataset
 from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workflow
 
 ROOT = Path(__file__).resolve().parent
-APP_STATE_VERSION = "background-planning-v4"
+APP_STATE_VERSION = "retrieval-evidence-v5"
 st.set_page_config(
     page_title="Everyday / together · Wardrobe Planner", page_icon="🌿", layout="wide"
 )
@@ -45,6 +45,15 @@ def planning_executor():
     return ThreadPoolExecutor(max_workers=2, thread_name_prefix="wardrobe-planner")
 
 
+def has_retrieval_evidence(state):
+    for record in state.get("tool_results", []):
+        if record["name"] == "prepare_planning_context":
+            return bool(record["result"].get("retrieval_metadata", {}).get("provider"))
+        if record["name"] == "search_style_guidance":
+            return all(document.get("retrieval_provider") for document in record["result"])
+    return False
+
+
 @st.fragment(run_every=1)
 def render_planning_progress():
     job = st.session_state.get("planning_job")
@@ -55,7 +64,15 @@ def render_planning_progress():
         return
 
     try:
-        st.session_state["planning_state"] = job.result()
+        planning_state = job.result()
+        if not has_retrieval_evidence(planning_state):
+            st.session_state["planning_error"] = (
+                "An older planning result was discarded because it had no retrieval evidence. "
+                "Please generate the plan again."
+            )
+        else:
+            planning_state["app_state_version"] = APP_STATE_VERSION
+            st.session_state["planning_state"] = planning_state
     except Exception:  # noqa: BLE001 -- Background failures stay inside the UI boundary.
         st.session_state["planning_error"] = (
             "Planning couldn’t finish. Please try again or choose Demo-safe local in Planning options."
@@ -159,10 +176,19 @@ def render_results(state):
         )
         if context_record:
             context = context_record["result"]
+            guidance = context.get("guidance", [])
             retrieval = context.get("retrieval_metadata", {})
             st.markdown("#### Retrieved guidance")
-            provider = retrieval.get("provider", "unknown")
-            st.caption(f"Provider: {provider} · Matches: {retrieval.get('match_count', 0)}")
+            providers = {
+                document.get("retrieval_provider")
+                for document in guidance
+                if document.get("retrieval_provider")
+            }
+            provider = retrieval.get("provider") or (
+                providers.pop() if len(providers) == 1 else "unknown"
+            )
+            match_count = retrieval.get("match_count", len(guidance))
+            st.caption(f"Provider: {provider} · Matches: {match_count}")
             for query_record in retrieval.get("queries", []):
                 event_name = (
                     "All selected events"
@@ -174,7 +200,7 @@ def render_results(state):
                 st.warning(
                     "Pinecone was unavailable for this run; local keyword retrieval was used."
                 )
-            for document in context.get("guidance", []):
+            for document in guidance:
                 score = document.get("retrieval_score")
                 score_text = f" · relevance {score:.3f}" if score is not None else ""
                 st.write(f"**{document['title']}**{score_text}")
@@ -372,13 +398,19 @@ else:
         st.rerun()
     planning_state = st.session_state.get("planning_state")
     if planning_state:
-        request = planning_state["request"]
-        if request["event_ids"] == selected_events and request["purchase_budget"] == budget:
-            render_results(planning_state)
+        if planning_state.get(
+            "app_state_version"
+        ) != APP_STATE_VERSION or not has_retrieval_evidence(planning_state):
+            st.session_state.pop("planning_state", None)
+            st.info("The previous plan used an older retrieval format. Generate it again.")
         else:
-            st.info(
-                "Your selections have changed. Generate a new plan to use these events and budget."
-            )
+            request = planning_state["request"]
+            if request["event_ids"] == selected_events and request["purchase_budget"] == budget:
+                render_results(planning_state)
+            else:
+                st.info(
+                    "Your selections have changed. Generate a new plan to use these events and budget."
+                )
 
 st.divider()
 st.caption(
