@@ -8,11 +8,15 @@ from wardrobe_planner.data.seed_loader import load_seed_dataset
 from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workflow
 
 ROOT = Path(__file__).resolve().parent
+APP_STATE_VERSION = "event-specific-rag-v3"
 st.set_page_config(
     page_title="Everyday / together · Wardrobe Planner", page_icon="🌿", layout="wide"
 )
 st.html(f"<style>{(ROOT / 'assets' / 'app.css').read_text(encoding='utf-8')}</style>")
 dataset = load_seed_dataset(ROOT / "data" / "seed")
+if st.session_state.get("app_state_version") != APP_STATE_VERSION:
+    st.session_state.pop("planning_state", None)
+    st.session_state["app_state_version"] = APP_STATE_VERSION
 member_by_id = {m.id: m for m in dataset.family_members}
 event_by_id = {e.id: e for e in dataset.events}
 item_by_id = {i.id: i for i in dataset.wardrobe_items}
@@ -130,10 +134,14 @@ def render_results(state):
             retrieval = context.get("retrieval_metadata", {})
             st.markdown("#### Retrieved guidance")
             provider = retrieval.get("provider", "unknown")
-            st.caption(
-                f"Provider: {provider} · Query: {retrieval.get('query', '')} · "
-                f"Matches: {retrieval.get('match_count', 0)}"
-            )
+            st.caption(f"Provider: {provider} · Matches: {retrieval.get('match_count', 0)}")
+            for query_record in retrieval.get("queries", []):
+                event_name = (
+                    "All selected events"
+                    if query_record["event_id"] == "all_selected_events"
+                    else event_by_id[query_record["event_id"]].name
+                )
+                st.caption(f"{event_name}: {query_record['query']}")
             if retrieval.get("fallback_used"):
                 st.warning(
                     "Pinecone was unavailable for this run; local keyword retrieval was used."

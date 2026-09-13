@@ -17,8 +17,7 @@ class NebiusPlanningAgent:
 
     def next_tool_calls(self, state: dict[str, Any]) -> list[dict[str, Any]]:
         if any(
-            result["name"] == "prepare_planning_context"
-            for result in state.get("tool_results", [])
+            result["name"] == "prepare_planning_context" for result in state.get("tool_results", [])
         ):
             return []
 
@@ -52,8 +51,12 @@ class NebiusPlanningAgent:
                 "You are a family wardrobe planning agent. Create one complete outfit for every "
                 "event/participant pair. Use only stable wardrobe item IDs returned by tools. "
                 "Prefer owned items. Reference a catalog item only when it was returned by the "
-                "catalog tool. Respect member preferences, event conditions, and the total "
-                "purchase budget. Use guidance IDs only when those records were retrieved. "
+                "catalog tool. Match core clothing formality to each event. Never use festive "
+                "items for casual or smart-casual events. For outdoor walking, prefer items "
+                "tagged for outings, travel, walking, or rain and choose comfortable footwear. "
+                "Respect member preferences, event conditions, and the total purchase budget. "
+                "Follow the retrieved guidance and cite at least one retrieved guidance ID in "
+                "every outfit. Use only guidance IDs that were actually retrieved. "
                 "Address every supplied validation error. Call submit_outfit_plan exactly once "
                 "with the complete plan. Set status to needs_review; deterministic validation "
                 "sets the final status."

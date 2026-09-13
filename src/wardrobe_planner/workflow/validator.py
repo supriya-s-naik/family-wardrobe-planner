@@ -6,7 +6,12 @@ from wardrobe_planner.domain.models import SeedDataset
 from wardrobe_planner.domain.plans import OutfitPlan
 
 
-def validate_plan(plan: OutfitPlan, dataset: SeedDataset, event_ids: list[str]) -> list[str]:
+def validate_plan(
+    plan: OutfitPlan,
+    dataset: SeedDataset,
+    event_ids: list[str],
+    retrieved_guidance_ids: set[str] | None = None,
+) -> list[str]:
     errors: list[str] = []
     items = {item.id: item for item in dataset.wardrobe_items}
     events = {event.id: event for event in dataset.events if event.id in set(event_ids)}
@@ -14,9 +19,7 @@ def validate_plan(plan: OutfitPlan, dataset: SeedDataset, event_ids: list[str]) 
     catalog = {item.id: item for item in dataset.catalog_items}
 
     expected_pairs = {
-        (event.id, member_id)
-        for event in events.values()
-        for member_id in event.participant_ids
+        (event.id, member_id) for event in events.values() for member_id in event.participant_ids
     }
     actual_pairs = [(outfit.event_id, outfit.member_id) for outfit in plan.outfits]
     pair_counts = Counter(actual_pairs)
@@ -34,6 +37,7 @@ def validate_plan(plan: OutfitPlan, dataset: SeedDataset, event_ids: list[str]) 
     for outfit in plan.outfits:
         selected_categories: set[str] = set()
         member = members.get(outfit.member_id)
+        event = events.get(outfit.event_id)
         for item_id in outfit.item_ids:
             item = items.get(item_id)
             if item is None:
@@ -44,6 +48,11 @@ def validate_plan(plan: OutfitPlan, dataset: SeedDataset, event_ids: list[str]) 
                 errors.append(f"Wrong owner for item {item_id}: expected {outfit.member_id}")
             if not item.available:
                 errors.append(f"Unavailable wardrobe item: {item_id}")
+            if event is not None and event.dress_code != "festive" and item.formality == "festive":
+                errors.append(
+                    f"Formality mismatch: festive item {item_id} used for "
+                    f"{event.dress_code} event {event.id}"
+                )
             if member is not None:
                 searchable = f"{item.name} {item.color} {item.notes or ''}".lower()
                 for avoided in [*member.avoided_colors, *member.avoided_styles]:
@@ -55,6 +64,15 @@ def validate_plan(plan: OutfitPlan, dataset: SeedDataset, event_ids: list[str]) 
             errors.append(f"Incomplete clothing for {outfit.event_id}/{outfit.member_id}")
         if "footwear" not in selected_categories:
             errors.append(f"Missing footwear for {outfit.event_id}/{outfit.member_id}")
+        if retrieved_guidance_ids is not None:
+            if not outfit.guidance_ids:
+                errors.append(f"Missing guidance citation for {outfit.event_id}/{outfit.member_id}")
+            unknown_guidance = sorted(set(outfit.guidance_ids) - retrieved_guidance_ids)
+            if unknown_guidance:
+                errors.append(
+                    f"Outfit {outfit.event_id}/{outfit.member_id} cites guidance that was not "
+                    f"retrieved: {unknown_guidance}"
+                )
 
     purchase_total = 0.0
     for purchase in plan.purchases:
@@ -85,4 +103,3 @@ def validate_plan(plan: OutfitPlan, dataset: SeedDataset, event_ids: list[str]) 
         errors.append(f"Wrong household ID: {plan.household_id}")
 
     return errors
-

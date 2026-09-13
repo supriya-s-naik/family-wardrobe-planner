@@ -7,9 +7,11 @@ The prototype retrieves reviewed fashion and cultural guidance before Nebius cre
 1. `scripts/index_guidance.py` loads the reviewed records in `data/seed/guidance.json`.
 2. Pinecone's `llama-text-embed-v2` integrated model embeds each `chunk_text` as a passage.
 3. The LangGraph context tool builds a query from selected event types and dress codes.
-4. Pinecone embeds the query and returns the six most relevant passages with scores.
+4. Pinecone embeds an event-specific query and returns the two most relevant passages with scores.
 5. The passages and source IDs are included in the Nebius planning context.
 6. The Streamlit planning-details panel exposes the query, provider, scores, sources, and text.
+
+Queries include the event name and type, dress code, setting, activities, notes, and weather. Multi-event plans add one cross-event reuse query. Results are de-duplicated by stable guidance ID before they reach Nebius.
 
 The index is `wardrobe-guidance` and the namespace is `reviewed-guidance-v1`. Ingestion is idempotent because every reviewed passage has a stable `_id`.
 

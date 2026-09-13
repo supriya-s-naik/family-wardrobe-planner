@@ -148,7 +148,13 @@ def build_planning_graph(
         if candidate is None:
             return {"validation_errors": ["Planner produced no candidate plan."]}
         plan = OutfitPlan.model_validate(candidate)
-        errors = validate_plan(plan, dataset, state["request"]["event_ids"])
+        retrieved_guidance_ids = _retrieved_guidance_ids(state.get("tool_results", []))
+        errors = validate_plan(
+            plan,
+            dataset,
+            state["request"]["event_ids"],
+            retrieved_guidance_ids=retrieved_guidance_ids,
+        )
         return {"validation_errors": errors}
 
     def repair_node(state: PlanningState) -> dict[str, Any]:
@@ -238,3 +244,13 @@ def run_nebius_workflow(dataset: SeedDataset) -> PlanningState:
 
 def _canonical_arguments(arguments: dict[str, Any]) -> str:
     return json.dumps(arguments, sort_keys=True, separators=(",", ":"))
+
+
+def _retrieved_guidance_ids(tool_results: list[dict[str, Any]]) -> set[str]:
+    ids: set[str] = set()
+    for record in tool_results:
+        if record["name"] == "search_style_guidance":
+            ids.update(result["id"] for result in record["result"])
+        elif record["name"] == "prepare_planning_context":
+            ids.update(result["id"] for result in record["result"].get("guidance", []))
+    return ids

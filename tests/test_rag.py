@@ -17,10 +17,10 @@ def planning_context_arguments(dataset):
 
 def test_planning_context_uses_pinecone_matches_when_available() -> None:
     dataset = load_seed_dataset(SEED_DIR)
+    calls = []
 
-    def fake_search(query_terms: list[str], limit: int):
-        assert "school celebration" in query_terms
-        assert limit == 6
+    def fake_search(query_terms: list[str], limit: int, dress_codes: list[str] | None):
+        calls.append((query_terms, limit, dress_codes))
         return [
             {
                 **dataset.guidance_documents[0].model_dump(mode="json"),
@@ -36,12 +36,18 @@ def test_planning_context_uses_pinecone_matches_when_available() -> None:
     assert context["retrieval_metadata"]["provider"] == "pinecone"
     assert context["retrieval_metadata"]["fallback_used"] is False
     assert context["guidance"][0]["retrieval_score"] == 0.91
+    assert len(context["retrieval_metadata"]["queries"]) == 4
+    assert len(calls) == 4
+    assert all(limit == 2 for _, limit, _ in calls)
+    assert any("Santa Cruz Coastal Outing" in terms for terms, _, _ in calls)
+    assert ["casual"] in [dress_codes for _, _, dress_codes in calls]
+    assert calls[-1][2] is None
 
 
 def test_planning_context_falls_back_when_pinecone_fails() -> None:
     dataset = load_seed_dataset(SEED_DIR)
 
-    def failing_search(_query_terms: list[str], _limit: int):
+    def failing_search(_query_terms: list[str], _limit: int, _dress_codes: list[str] | None):
         raise ConnectionError("test outage")
 
     tools = ToolExecutor(LocalPlanningData(dataset), guidance_search=failing_search)

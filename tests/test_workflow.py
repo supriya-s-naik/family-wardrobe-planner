@@ -44,6 +44,46 @@ def test_validator_rejects_an_item_owned_by_another_member() -> None:
     assert any("Wrong owner" in error for error in errors)
 
 
+def test_validator_rejects_festive_items_for_a_casual_outing() -> None:
+    dataset = load_seed_dataset(SEED_DIR)
+    state = run_demo_workflow(dataset)
+    result = deepcopy(state["final_result"])
+    result.pop("validation_errors")
+    result.pop("workflow_metrics")
+    coastal_maya = next(
+        outfit
+        for outfit in result["outfits"]
+        if outfit["event_id"] == "event_coastal_outing" and outfit["member_id"] == "member_maya"
+    )
+    coastal_maya["item_ids"][0] = "maya_top_02"
+
+    errors = validate_plan(
+        OutfitPlan.model_validate(result),
+        dataset,
+        dataset.demo_request.event_ids,
+    )
+
+    assert any("Formality mismatch" in error for error in errors)
+
+
+def test_validator_rejects_guidance_that_was_not_retrieved() -> None:
+    dataset = load_seed_dataset(SEED_DIR)
+    state = run_demo_workflow(dataset)
+    result = deepcopy(state["final_result"])
+    result.pop("validation_errors")
+    result.pop("workflow_metrics")
+    result["outfits"][0]["guidance_ids"] = ["guide_not_retrieved"]
+
+    errors = validate_plan(
+        OutfitPlan.model_validate(result),
+        dataset,
+        dataset.demo_request.event_ids,
+        retrieved_guidance_ids={document.id for document in dataset.guidance_documents},
+    )
+
+    assert any("was not retrieved" in error for error in errors)
+
+
 def test_nebius_agent_backend_drives_the_same_graph_contract() -> None:
     dataset = load_seed_dataset(SEED_DIR)
     local_state = run_demo_workflow(dataset)

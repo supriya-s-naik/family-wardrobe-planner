@@ -110,7 +110,8 @@ class ToolExecutor:
     def __init__(
         self,
         data: LocalPlanningData,
-        guidance_search: Callable[[list[str], int], list[dict[str, Any]]] | None = None,
+        guidance_search: Callable[[list[str], int, list[str] | None], list[dict[str, Any]]]
+        | None = None,
     ) -> None:
         self.data = data
         self.guidance_search = guidance_search
@@ -127,10 +128,14 @@ class ToolExecutor:
             members = self.data.get_family_profiles(member_ids)
             if {member.id for member in members} != set(member_ids):
                 raise ValueError("Planning context requested an unknown member ID")
-            query_terms = [
-                term for event in events for term in (event.event_type, event.dress_code)
-            ]
-            guidance, retrieval_metadata = self._retrieve_guidance(query_terms, limit=6)
+            weather_by_event = {
+                event.id: self.data.get_weather(event.weather_key).model_dump(mode="json")
+                for event in events
+            }
+            guidance, retrieval_metadata = self._retrieve_event_guidance(
+                events,
+                weather_by_event,
+            )
             return {
                 "wardrobe_by_member": {
                     member.id: [
@@ -139,10 +144,7 @@ class ToolExecutor:
                     ]
                     for member in members
                 },
-                "weather_by_event": {
-                    event.id: self.data.get_weather(event.weather_key).model_dump(mode="json")
-                    for event in events
-                },
+                "weather_by_event": weather_by_event,
                 "guidance": guidance,
                 "retrieval_metadata": retrieval_metadata,
                 "catalog": [
@@ -182,14 +184,17 @@ class ToolExecutor:
         raise ValueError(f"Unknown tool: {name}")
 
     def _retrieve_guidance(
-        self, query_terms: list[str], limit: int
+        self,
+        query_terms: list[str],
+        limit: int,
+        dress_codes: list[str] | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         query = "Family wardrobe styling guidance for " + ", ".join(
             str(term).replace("_", " ") for term in query_terms
         )
         if self.guidance_search is not None:
             try:
-                matches = self.guidance_search(query_terms, limit)
+                matches = self.guidance_search(query_terms, limit, dress_codes)
                 return matches, {
                     "provider": "pinecone",
                     "query": query,
@@ -201,6 +206,18 @@ class ToolExecutor:
         else:
             fallback_reason = "PineconeNotConfigured"
 
+        local_documents = self.data.search_guidance(
+            query_terms,
+            limit=len(self.data.dataset.guidance_documents),
+        )
+        if dress_codes:
+            allowed_dress_codes = set(dress_codes)
+            local_documents = [
+                document
+                for document in local_documents
+                if allowed_dress_codes.intersection(document.dress_codes)
+            ]
+
         local_matches = [
             {
                 **document.model_dump(mode="json"),
@@ -208,7 +225,7 @@ class ToolExecutor:
                 "retrieval_query": query,
                 "retrieval_score": None,
             }
-            for document in self.data.search_guidance(query_terms, limit=limit)
+            for document in local_documents[:limit]
         ]
         return local_matches, {
             "provider": "local_keyword",
@@ -216,4 +233,70 @@ class ToolExecutor:
             "match_count": len(local_matches),
             "fallback_used": self.guidance_search is not None,
             "fallback_reason": fallback_reason,
+        }
+
+    def _retrieve_event_guidance(
+        self, events: list[Any], weather_by_event: dict[str, dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        matches_by_id: dict[str, dict[str, Any]] = {}
+        query_records = []
+
+        for event in events:
+            weather = weather_by_event[event.id]
+            query_terms = [
+                event.name,
+                event.event_type,
+                event.dress_code,
+                event.setting,
+                *event.activities,
+                event.notes or "",
+                weather["condition"],
+                f"{weather['high_f']} degree high",
+                f"{weather['precipitation_probability']} percent chance of rain",
+            ]
+            matches, metadata = self._retrieve_guidance(
+                query_terms,
+                limit=2,
+                dress_codes=[event.dress_code],
+            )
+            query_records.append({"event_id": event.id, **metadata})
+            for match in matches:
+                existing = matches_by_id.get(match["id"])
+                if existing is None or (match.get("retrieval_score") or 0) > (
+                    existing.get("retrieval_score") or 0
+                ):
+                    matches_by_id[match["id"]] = match
+
+        if len(events) > 1:
+            matches, metadata = self._retrieve_guidance(
+                [
+                    "multi-event planning",
+                    "outfit reuse",
+                    "wardrobe",
+                    "gap",
+                    "purchase",
+                    "shopping",
+                    "family",
+                ],
+                limit=2,
+            )
+            query_records.append({"event_id": "all_selected_events", **metadata})
+            for match in matches:
+                matches_by_id.setdefault(match["id"], match)
+
+        providers = {record["provider"] for record in query_records}
+        fallback_used = any(record["fallback_used"] for record in query_records)
+        return list(matches_by_id.values()), {
+            "provider": providers.pop() if len(providers) == 1 else "mixed",
+            "queries": query_records,
+            "match_count": len(matches_by_id),
+            "fallback_used": fallback_used,
+            "fallback_reason": next(
+                (
+                    record.get("fallback_reason")
+                    for record in query_records
+                    if record.get("fallback_reason")
+                ),
+                None,
+            ),
         }

@@ -84,12 +84,18 @@ class PineconeGuidanceRAG:
         )
         return int(response.record_count)
 
-    def search_guidance(self, query_terms: list[str], limit: int = 4) -> list[dict[str, Any]]:
+    def search_guidance(
+        self,
+        query_terms: list[str],
+        limit: int = 4,
+        dress_codes: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         query = build_guidance_query(query_terms)
         response = self.client.index(self.index_name).search(
             namespace=self.namespace,
             top_k=limit,
             inputs={"text": query},
+            filter={"dress_codes": {"$in": dress_codes}} if dress_codes else None,
             fields=[
                 "chunk_text",
                 "title",
