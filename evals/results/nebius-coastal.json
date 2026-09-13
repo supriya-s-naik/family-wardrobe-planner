@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-09-13T01:34:02.267853+00:00",
+  "backend": "nebius",
+  "passed_cases": 1,
+  "total_cases": 1,
+  "pass_rate": 1.0,
+  "results": [
+    {
+      "case_id": "coastal_standard",
+      "description": "Rain-aware casual coastal outing.",
+      "backend": "nebius",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 3,
+        "purchase_cost": 38.0,
+        "owned_items_used": 11,
+        "tool_calls": 1,
+        "latency_ms": 17841,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    }
+  ]
+}

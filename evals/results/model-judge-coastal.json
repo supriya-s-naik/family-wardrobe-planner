@@ -1,0 +1,38 @@
+{
+  "generated_at": "2026-09-13T01:42:11.116671+00:00",
+  "case_id": "coastal_standard",
+  "planner_backend": "local",
+  "judge_model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+  "same_model_family_warning": "The configured judge may share biases with the planner; treat these scores as advisory.",
+  "judgment": {
+    "event_fit": {
+      "score": 5,
+      "evidence": "The event is a casual weekend outdoor outing in Santa Cruz with activities like walking, picnic, and boardwalk. All outfits use casual attire with appropriate layers and footwear. Maya and Arjun wear breathable tops, comfortable bottoms, and walking shoes. Anaya\u2019s outfit allows active play. The inclusion of packable rain shells aligns with the 'possible showers' note, meeting the casual dress code and activity needs."
+    },
+    "weather_readiness": {
+      "score": 5,
+      "evidence": "The retrieved guidance 'guide_coastal_layers' explicitly recommends a packable rain-resistant outer layer for possible showers. Both Maya and Anaya have added such a shell (catalog_01 and catalog_02), directly addressing the forecast uncertainty and coastal conditions. The plan accounts for changing weather and extended walking, ensuring protection without compromising mobility."
+    },
+    "personal_comfort": {
+      "score": 5,
+      "evidence": "Maya\u2019s comfort need for flats is met with shoe choice (maya_shoe_02), and she prefers light layers\u2014achieved with breathable base layers and a removable shell. Arjun\u2019s need for breathable fabrics and comfortable walking shoes is satisfied by his selected items. Anaya\u2019s requirement for soft fabrics and unrestricted movement is fulfilled by her outfit, which allows active play. All choices align with stated comfort needs."
+    },
+    "family_coordination": {
+      "score": 4,
+      "evidence": "The family uses a shared neutral color palette (navy, teal, white) and coordinated layering, promoting visual harmony. However, the coordination is not through identical outfits but through shared functional elements (rain shells) and complementary colors. While this avoids forced uniformity, the plan could have strengthened cohesion by using a repeated accent color (e.g., coral or purple) across adult and child outfits, as suggested in 'guide_smart_casual_school'. The lack of a shared color thread slightly weakens coordination."
+    },
+    "grounded_rationale": {
+      "score": 5,
+      "evidence": "Each outfit is justified by the event\u2019s context: casual dress code, outdoor activities, and variable weather. The rationale explicitly references 'guide_coastal_layers' and 'guide_child_comfort', directly linking choices to guidance. Purchases are targeted\u2014only rain shells are added\u2014filling a functional gap. The plan uses owned items first, minimizing waste and aligning with 'guide_purchase_reuse'. All decisions are traceable to the event, member needs, and retrieved guidance."
+    },
+    "purchase_value": {
+      "score": 5,
+      "evidence": "The total cost is $96.00, under the $100 budget. The purchases (catalog_01 and catalog_02) are rain shells\u2014highly functional, reusable across multiple future outings, and coordinate with multiple owned pieces. They fill a recurring gap (rain protection) and are not event-specific. This aligns with 'guide_purchase_reuse' by prioritizing multi-use, budget-conscious, and gap-filling items. No unnecessary or duplicate purchases were made."
+    },
+    "overall_score": 4.8,
+    "summary": "The wardrobe plan excels in event fit, weather readiness, personal comfort, grounded rationale, and purchase value. It effectively uses owned items, adds only essential rain protection, and respects individual comfort needs. Family coordination is strong but could be slightly improved with a shared accent color. The plan is efficient, budget-conscious, and fully aligned with retrieved guidance.",
+    "concerns": [
+      "Family coordination could be enhanced by incorporating a shared accent color (e.g., coral or purple) across adult and child outfits to strengthen visual unity without requiring identical outfits."
+    ]
+  }
+}

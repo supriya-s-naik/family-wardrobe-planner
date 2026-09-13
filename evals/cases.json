@@ -1,0 +1,131 @@
+[
+  {
+    "id": "school_standard",
+    "description": "Smart-casual school event for the full family.",
+    "event_ids": ["event_school_celebration"],
+    "purchase_budget": 100,
+    "expected_outfit_count": 3,
+    "expected_guidance_ids": ["guide_smart_casual_school"],
+    "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance"],
+    "max_tool_calls": 8
+  },
+  {
+    "id": "festive_standard",
+    "description": "Festive family dinner with cultural preferences.",
+    "event_ids": ["event_festive_dinner"],
+    "purchase_budget": 100,
+    "expected_outfit_count": 3,
+    "expected_guidance_ids": ["guide_festive_family"],
+    "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance"],
+    "max_tool_calls": 8
+  },
+  {
+    "id": "coastal_standard",
+    "description": "Rain-aware casual coastal outing.",
+    "event_ids": ["event_coastal_outing"],
+    "purchase_budget": 100,
+    "expected_outfit_count": 3,
+    "expected_guidance_ids": ["guide_coastal_layers"],
+    "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance", "search_sample_catalog"],
+    "max_tool_calls": 8
+  },
+  {
+    "id": "multi_event_standard",
+    "description": "All three events planned together within the standard budget.",
+    "event_ids": ["event_school_celebration", "event_festive_dinner", "event_coastal_outing"],
+    "purchase_budget": 100,
+    "expected_outfit_count": 9,
+    "expected_guidance_ids": ["guide_smart_casual_school", "guide_festive_family", "guide_coastal_layers"],
+    "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance", "search_sample_catalog"],
+    "max_tool_calls": 8,
+    "repeat_runs": 2
+  },
+  {
+    "id": "school_zero_budget",
+    "description": "School event must use owned items with no shopping budget.",
+    "event_ids": ["event_school_celebration"],
+    "purchase_budget": 0,
+    "expected_outfit_count": 3,
+    "expected_guidance_ids": ["guide_smart_casual_school"],
+    "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance"],
+    "max_tool_calls": 8
+  },
+  {
+    "id": "festive_zero_budget",
+    "description": "Festive dinner must use owned items with no shopping budget.",
+    "event_ids": ["event_festive_dinner"],
+    "purchase_budget": 0,
+    "expected_outfit_count": 3,
+    "expected_guidance_ids": ["guide_festive_family"],
+    "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance"],
+    "max_tool_calls": 8
+  },
+  {
+    "id": "coastal_zero_budget",
+    "description": "Coastal outing respects a zero-dollar purchase limit.",
+    "event_ids": ["event_coastal_outing"],
+    "purchase_budget": 0,
+    "expected_outfit_count": 3,
+    "expected_guidance_ids": ["guide_coastal_layers"],
+    "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance", "search_sample_catalog"],
+    "max_tool_calls": 8
+  },
+  {
+    "id": "multi_event_zero_budget",
+    "description": "All events planned together without purchases.",
+    "event_ids": ["event_school_celebration", "event_festive_dinner", "event_coastal_outing"],
+    "purchase_budget": 0,
+    "expected_outfit_count": 9,
+    "expected_guidance_ids": ["guide_smart_casual_school", "guide_festive_family", "guide_coastal_layers"],
+    "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance", "search_sample_catalog"],
+    "max_tool_calls": 8
+  },
+  {
+    "id": "coastal_maya_sneakers_unavailable",
+    "description": "Planner must not select Maya's unavailable walking sneakers.",
+    "event_ids": ["event_coastal_outing"],
+    "purchase_budget": 100,
+    "unavailable_item_ids": ["maya_shoe_02"],
+    "forbidden_item_ids": ["maya_shoe_02"],
+    "expected_outfit_count": 3,
+    "expected_guidance_ids": ["guide_coastal_layers"],
+    "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance", "search_sample_catalog"],
+    "max_tool_calls": 8
+  },
+  {
+    "id": "coastal_anaya_sneakers_unavailable",
+    "description": "Planner must not select Anaya's unavailable play sneakers.",
+    "event_ids": ["event_coastal_outing"],
+    "purchase_budget": 100,
+    "unavailable_item_ids": ["anaya_shoe_02"],
+    "forbidden_item_ids": ["anaya_shoe_02"],
+    "expected_outfit_count": 3,
+    "expected_guidance_ids": ["guide_coastal_layers"],
+    "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance", "search_sample_catalog"],
+    "max_tool_calls": 8
+  },
+  {
+    "id": "school_arjun_loafers_unavailable",
+    "description": "Planner must find alternate footwear when Arjun's loafers are unavailable.",
+    "event_ids": ["event_school_celebration"],
+    "purchase_budget": 100,
+    "unavailable_item_ids": ["arjun_shoe_01"],
+    "forbidden_item_ids": ["arjun_shoe_01"],
+    "expected_outfit_count": 3,
+    "expected_guidance_ids": ["guide_smart_casual_school"],
+    "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance"],
+    "max_tool_calls": 8
+  },
+  {
+    "id": "festive_anaya_kurta_unavailable",
+    "description": "Planner must avoid Anaya's unavailable festive kurta and remain complete.",
+    "event_ids": ["event_festive_dinner"],
+    "purchase_budget": 100,
+    "unavailable_item_ids": ["anaya_top_02"],
+    "forbidden_item_ids": ["anaya_top_02"],
+    "expected_outfit_count": 3,
+    "expected_guidance_ids": ["guide_festive_family"],
+    "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance"],
+    "max_tool_calls": 8
+  }
+]

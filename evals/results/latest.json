@@ -1,0 +1,523 @@
+{
+  "generated_at": "2026-09-13T01:31:16.355476+00:00",
+  "backend": "local",
+  "passed_cases": 12,
+  "total_cases": 12,
+  "pass_rate": 1.0,
+  "results": [
+    {
+      "case_id": "school_standard",
+      "description": "Smart-casual school event for the full family.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 3,
+        "purchase_cost": 0.0,
+        "owned_items_used": 12,
+        "tool_calls": 5,
+        "latency_ms": 18,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_purchase_reuse",
+          "guide_repeat_balance",
+          "guide_smart_casual_school"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_smart_casual_school"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    },
+    {
+      "case_id": "festive_standard",
+      "description": "Festive family dinner with cultural preferences.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 3,
+        "purchase_cost": 0.0,
+        "owned_items_used": 11,
+        "tool_calls": 5,
+        "latency_ms": 15,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_festive_family",
+          "guide_purchase_reuse",
+          "guide_repeat_balance"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_festive_family"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    },
+    {
+      "case_id": "coastal_standard",
+      "description": "Rain-aware casual coastal outing.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 3,
+        "purchase_cost": 96.0,
+        "owned_items_used": 10,
+        "tool_calls": 6,
+        "latency_ms": 14,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers",
+          "guide_purchase_reuse",
+          "guide_repeat_balance",
+          "guide_smart_casual_school"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    },
+    {
+      "case_id": "multi_event_standard",
+      "description": "All three events planned together within the standard budget.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 9,
+        "purchase_cost": 96.0,
+        "owned_items_used": 30,
+        "tool_calls": 8,
+        "latency_ms": 30,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers",
+          "guide_festive_family",
+          "guide_purchase_reuse",
+          "guide_repeat_balance",
+          "guide_smart_casual_school"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_purchase_reuse",
+          "guide_smart_casual_school"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    },
+    {
+      "case_id": "school_zero_budget",
+      "description": "School event must use owned items with no shopping budget.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 3,
+        "purchase_cost": 0.0,
+        "owned_items_used": 12,
+        "tool_calls": 5,
+        "latency_ms": 13,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_purchase_reuse",
+          "guide_repeat_balance",
+          "guide_smart_casual_school"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_smart_casual_school"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    },
+    {
+      "case_id": "festive_zero_budget",
+      "description": "Festive dinner must use owned items with no shopping budget.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 3,
+        "purchase_cost": 0.0,
+        "owned_items_used": 11,
+        "tool_calls": 5,
+        "latency_ms": 14,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_festive_family",
+          "guide_purchase_reuse",
+          "guide_repeat_balance"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_festive_family"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    },
+    {
+      "case_id": "coastal_zero_budget",
+      "description": "Coastal outing respects a zero-dollar purchase limit.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 3,
+        "purchase_cost": 0.0,
+        "owned_items_used": 10,
+        "tool_calls": 6,
+        "latency_ms": 14,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers",
+          "guide_purchase_reuse",
+          "guide_repeat_balance",
+          "guide_smart_casual_school"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    },
+    {
+      "case_id": "multi_event_zero_budget",
+      "description": "All events planned together without purchases.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 9,
+        "purchase_cost": 0.0,
+        "owned_items_used": 30,
+        "tool_calls": 8,
+        "latency_ms": 16,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers",
+          "guide_festive_family",
+          "guide_purchase_reuse",
+          "guide_repeat_balance",
+          "guide_smart_casual_school"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_purchase_reuse",
+          "guide_smart_casual_school"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    },
+    {
+      "case_id": "coastal_maya_sneakers_unavailable",
+      "description": "Planner must not select Maya's unavailable walking sneakers.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 3,
+        "purchase_cost": 96.0,
+        "owned_items_used": 10,
+        "tool_calls": 6,
+        "latency_ms": 15,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers",
+          "guide_purchase_reuse",
+          "guide_repeat_balance",
+          "guide_smart_casual_school"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    },
+    {
+      "case_id": "coastal_anaya_sneakers_unavailable",
+      "description": "Planner must not select Anaya's unavailable play sneakers.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 3,
+        "purchase_cost": 96.0,
+        "owned_items_used": 10,
+        "tool_calls": 6,
+        "latency_ms": 14,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers",
+          "guide_purchase_reuse",
+          "guide_repeat_balance",
+          "guide_smart_casual_school"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    },
+    {
+      "case_id": "school_arjun_loafers_unavailable",
+      "description": "Planner must find alternate footwear when Arjun's loafers are unavailable.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 3,
+        "purchase_cost": 0.0,
+        "owned_items_used": 12,
+        "tool_calls": 5,
+        "latency_ms": 14,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_purchase_reuse",
+          "guide_repeat_balance",
+          "guide_smart_casual_school"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_smart_casual_school"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    },
+    {
+      "case_id": "festive_anaya_kurta_unavailable",
+      "description": "Planner must avoid Anaya's unavailable festive kurta and remain complete.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 3,
+        "purchase_cost": 0.0,
+        "owned_items_used": 11,
+        "tool_calls": 5,
+        "latency_ms": 13,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_festive_family",
+          "guide_purchase_reuse",
+          "guide_repeat_balance"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_festive_family"
+        ],
+        "validation_errors": []
+      },
+      "failures": []
+    }
+  ]
+}
