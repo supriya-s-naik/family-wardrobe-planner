@@ -8,6 +8,7 @@ from openai import OpenAIError
 from pydantic import ValidationError
 
 from wardrobe_planner.adapters.local import LocalPlanningData
+from wardrobe_planner.adapters.pinecone_rag import PineconeGuidanceRAG
 from wardrobe_planner.domain.models import DemoRequest, SeedDataset
 from wardrobe_planner.domain.plans import OutfitPlan
 from wardrobe_planner.workflow.agent import PlanningAgent
@@ -21,9 +22,13 @@ MAX_TOOL_CALLS = 8
 MAX_REPAIR_ATTEMPTS = 2
 
 
-def build_planning_graph(dataset: SeedDataset, agent: PlanningAgent | None = None):
+def build_planning_graph(
+    dataset: SeedDataset,
+    agent: PlanningAgent | None = None,
+    guidance_search=None,
+):
     data = LocalPlanningData(dataset)
-    tools = ToolExecutor(data)
+    tools = ToolExecutor(data, guidance_search=guidance_search)
     planning_agent = agent or LocalPlanningAgent()
 
     def load_context(state: PlanningState) -> dict[str, Any]:
@@ -75,7 +80,9 @@ def build_planning_graph(dataset: SeedDataset, agent: PlanningAgent | None = Non
                 (result["name"], _canonical_arguments(result["arguments"]))
                 for result in state.get("tool_results", [])
             }
-            new_signatures = [(call["name"], _canonical_arguments(call["arguments"])) for call in calls]
+            new_signatures = [
+                (call["name"], _canonical_arguments(call["arguments"])) for call in calls
+            ]
             if len(new_signatures) != len(set(new_signatures)) or any(
                 signature in completed_signatures for signature in new_signatures
             ):
@@ -217,7 +224,15 @@ def run_demo_workflow(dataset: SeedDataset) -> PlanningState:
 
 
 def run_nebius_workflow(dataset: SeedDataset) -> PlanningState:
-    graph = build_planning_graph(dataset, NebiusPlanningAgent())
+    try:
+        guidance_search = PineconeGuidanceRAG.from_env().search_guidance
+    except RuntimeError:
+        guidance_search = None
+    graph = build_planning_graph(
+        dataset,
+        NebiusPlanningAgent(),
+        guidance_search=guidance_search,
+    )
     return graph.invoke({"request": dataset.demo_request.model_dump(mode="json")})
 
 

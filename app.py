@@ -117,6 +117,33 @@ def render_results(state):
             actor = "Workflow" if trace.get("actor") == "workflow" else "Agent"
             st.write(f"**{trace['step']}. {trace['tool']}** · {actor} — {trace['reason']}")
             st.json(trace["arguments"])
+        context_record = next(
+            (
+                record
+                for record in state.get("tool_results", [])
+                if record["name"] == "prepare_planning_context"
+            ),
+            None,
+        )
+        if context_record:
+            context = context_record["result"]
+            retrieval = context.get("retrieval_metadata", {})
+            st.markdown("#### Retrieved guidance")
+            provider = retrieval.get("provider", "unknown")
+            st.caption(
+                f"Provider: {provider} · Query: {retrieval.get('query', '')} · "
+                f"Matches: {retrieval.get('match_count', 0)}"
+            )
+            if retrieval.get("fallback_used"):
+                st.warning(
+                    "Pinecone was unavailable for this run; local keyword retrieval was used."
+                )
+            for document in context.get("guidance", []):
+                score = document.get("retrieval_score")
+                score_text = f" · relevance {score:.3f}" if score is not None else ""
+                st.write(f"**{document['title']}**{score_text}")
+                st.caption(f"{document['source']} · `{document['id']}`")
+                st.write(document["text"])
 
 
 brand, household = st.columns([3, 1])
@@ -280,7 +307,9 @@ else:
             ),
         )
         if backend == "Nebius live":
-            st.caption("Live planning usually takes about a minute while the AI builds all family outfits.")
+            st.caption(
+                "Live planning usually takes about a minute while the AI builds all family outfits."
+            )
     if st.button("Generate family plan", type="primary", disabled=not selected_events):
         st.session_state.pop("planning_state", None)
         request_dataset = dataset.model_copy(deep=True)

@@ -223,19 +223,18 @@ Write-capable tools are deliberately limited:
 
 ## RAG ingestion and retrieval
 
-Before the demo, reviewed guidance documents are split into short topic-focused passages. Each Pinecone record contains:
+The idempotent `scripts/index_guidance.py` command loads reviewed, topic-focused passages into the `wardrobe-guidance` index and `reviewed-guidance-v1` namespace. Pinecone's integrated `llama-text-embed-v2` model embeds passages during ingestion and embeds queries during search. Each record contains:
 
-- `document_id`
-- `passage_id`
+- `_id`
 - `title`
 - `source`
-- `text`
+- `chunk_text`
 - `event_types[]`
 - `dress_codes[]`
 - `season_tags[]`
 - `audience_tags[]`
 
-At planning time, the system builds retrieval queries from event type, dress code, conditions, and relevant family constraints. It returns a small number of passages with scores and source metadata. The interface shows the source title for guidance used in the explanation.
+At planning time, the context tool builds a semantic query from event type and dress code. Pinecone returns passages with scores and source metadata before the prompt is sent to Nebius. The interface exposes the retrieval provider, query, scores, source IDs, and passage text. A Pinecone failure uses the deterministic local keyword retriever and labels that fallback in the same panel.
 
 ## Memory lifecycle
 

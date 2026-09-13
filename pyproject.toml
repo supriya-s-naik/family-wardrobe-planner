@@ -10,7 +10,7 @@ dependencies = [
   "langgraph>=0.2",
   "langsmith>=0.1",
   "mem0ai>=0.1",
-  "pinecone>=5.0",
+  "pinecone>=10,<11",
   "pydantic>=2.8",
   "python-dotenv>=1.0",
   "streamlit>=1.39",
@@ -36,4 +36,3 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-

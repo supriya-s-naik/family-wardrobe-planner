@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from wardrobe_planner.adapters.local import LocalPlanningData
@@ -106,10 +107,17 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
 
 
 class ToolExecutor:
-    def __init__(self, data: LocalPlanningData) -> None:
+    def __init__(
+        self,
+        data: LocalPlanningData,
+        guidance_search: Callable[[list[str], int], list[dict[str, Any]]] | None = None,
+    ) -> None:
         self.data = data
+        self.guidance_search = guidance_search
 
-    def execute(self, name: str, arguments: dict[str, Any]) -> list[dict[str, Any]] | dict[str, Any]:
+    def execute(
+        self, name: str, arguments: dict[str, Any]
+    ) -> list[dict[str, Any]] | dict[str, Any]:
         if name == "prepare_planning_context":
             event_ids = [str(event_id) for event_id in arguments["event_ids"]]
             member_ids = [str(member_id) for member_id in arguments["member_ids"]]
@@ -122,6 +130,7 @@ class ToolExecutor:
             query_terms = [
                 term for event in events for term in (event.event_type, event.dress_code)
             ]
+            guidance, retrieval_metadata = self._retrieve_guidance(query_terms, limit=6)
             return {
                 "wardrobe_by_member": {
                     member.id: [
@@ -134,10 +143,8 @@ class ToolExecutor:
                     event.id: self.data.get_weather(event.weather_key).model_dump(mode="json")
                     for event in events
                 },
-                "guidance": [
-                    document.model_dump(mode="json")
-                    for document in self.data.search_guidance(query_terms, limit=6)
-                ],
+                "guidance": guidance,
+                "retrieval_metadata": retrieval_metadata,
                 "catalog": [
                     item.model_dump(mode="json")
                     for item in self.data.search_catalog(
@@ -161,11 +168,11 @@ class ToolExecutor:
         if name == "get_weather":
             return self.data.get_weather(str(arguments["weather_key"])).model_dump(mode="json")
         if name == "search_style_guidance":
-            results = self.data.search_guidance(
+            results, _ = self._retrieve_guidance(
                 query_terms=list(arguments["query_terms"]),
                 limit=int(arguments.get("limit", 4)),
             )
-            return [document.model_dump(mode="json") for document in results]
+            return results
         if name == "search_sample_catalog":
             results = self.data.search_catalog(
                 max_price=float(arguments["max_price"]),
@@ -173,3 +180,40 @@ class ToolExecutor:
             )
             return [item.model_dump(mode="json") for item in results]
         raise ValueError(f"Unknown tool: {name}")
+
+    def _retrieve_guidance(
+        self, query_terms: list[str], limit: int
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        query = "Family wardrobe styling guidance for " + ", ".join(
+            str(term).replace("_", " ") for term in query_terms
+        )
+        if self.guidance_search is not None:
+            try:
+                matches = self.guidance_search(query_terms, limit)
+                return matches, {
+                    "provider": "pinecone",
+                    "query": query,
+                    "match_count": len(matches),
+                    "fallback_used": False,
+                }
+            except Exception as exc:  # noqa: BLE001 -- RAG has a deliberate local fallback.
+                fallback_reason = type(exc).__name__
+        else:
+            fallback_reason = "PineconeNotConfigured"
+
+        local_matches = [
+            {
+                **document.model_dump(mode="json"),
+                "retrieval_provider": "local_keyword",
+                "retrieval_query": query,
+                "retrieval_score": None,
+            }
+            for document in self.data.search_guidance(query_terms, limit=limit)
+        ]
+        return local_matches, {
+            "provider": "local_keyword",
+            "query": query,
+            "match_count": len(local_matches),
+            "fallback_used": self.guidance_search is not None,
+            "fallback_reason": fallback_reason,
+        }

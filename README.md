@@ -26,6 +26,7 @@ Python 3.11 or newer and `uv` are recommended.
 ```powershell
 uv sync --extra dev
 uv run python scripts/validate_seed.py
+uv run python scripts/index_guidance.py
 uv run python scripts/smoke_test_nebius.py
 uv run streamlit run app.py
 ```
@@ -68,4 +69,4 @@ Exact inventory, ownership, availability, events, budget, and saved plans remain
 
 ## Workflow implemented
 
-The interface offers two backends. **Nebius live** is the primary path: LangGraph gathers the authoritative planning context through one aggregate typed tool, then makes one Nebius request in which the model builds and submits the complete plan through the typed `submit_outfit_plan` tool. This keeps model autonomy in outfit reasoning while avoiding a fragile chain of provider round trips. **Demo-safe local** follows the same graph and validation rules without network access and retains the granular tool trace for demonstration. Both paths validate ownership, availability, coverage, preferences, purchase references, and budget, and permit at most two repair attempts. Provider failures are shown explicitly and never silently switch to the local path.
+The interface offers two backends. **Nebius live** is the primary path: LangGraph gathers the authoritative planning context through one aggregate typed tool, retrieves semantically relevant reviewed guidance from Pinecone, then makes one Nebius request in which the model builds and submits the complete plan through the typed `submit_outfit_plan` tool. Planning details display the retrieval query, provider, relevance scores, sources, and passages. If Pinecone is unavailable, the run is visibly labeled as a local-keyword fallback. **Demo-safe local** follows the same graph and validation rules without network access and retains the granular tool trace for demonstration. Both paths validate ownership, availability, coverage, preferences, purchase references, and budget, and permit at most two repair attempts.
