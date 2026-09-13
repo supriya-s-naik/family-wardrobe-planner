@@ -2,14 +2,16 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from html import escape
 from pathlib import Path
+from uuid import uuid4
 
 import streamlit as st
 
 from wardrobe_planner.data.seed_loader import load_seed_dataset
+from wardrobe_planner.domain.models import Event, WardrobeItem, WeatherSnapshot
 from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workflow
 
 ROOT = Path(__file__).resolve().parent
-APP_STATE_VERSION = "background-result-v6"
+APP_STATE_VERSION = "wardrobe-event-intake-v7"
 st.set_page_config(
     page_title="Everyday / together · Wardrobe Planner", page_icon="🌿", layout="wide"
 )
@@ -20,6 +22,17 @@ if st.session_state.get("app_state_version") != APP_STATE_VERSION:
     st.session_state.pop("planning_job", None)
     st.session_state.pop("planning_error", None)
     st.session_state["app_state_version"] = APP_STATE_VERSION
+st.session_state.setdefault("session_wardrobe_items", [])
+st.session_state.setdefault("session_wardrobe_images", {})
+st.session_state.setdefault("session_events", [])
+st.session_state.setdefault("session_weather", [])
+dataset.wardrobe_items.extend(
+    WardrobeItem.model_validate(item) for item in st.session_state["session_wardrobe_items"]
+)
+dataset.events.extend(Event.model_validate(event) for event in st.session_state["session_events"])
+dataset.weather.extend(
+    WeatherSnapshot.model_validate(weather) for weather in st.session_state["session_weather"]
+)
 member_by_id = {m.id: m for m in dataset.family_members}
 event_by_id = {e.id: e for e in dataset.events}
 item_by_id = {i.id: i for i in dataset.wardrobe_items}
@@ -76,6 +89,162 @@ def navigate(page, event_id=None):
 def open_wardrobe(member_id):
     st.session_state["owner"] = member_id
     navigate("Wardrobe")
+
+
+@st.dialog("Add a wardrobe item")
+def add_wardrobe_item_dialog():
+    st.write("Upload a photo and add a few details so the planner can use this piece.")
+    with st.form("add_wardrobe_item_form"):
+        photo = st.file_uploader(
+            "Garment or accessory photo",
+            type=["jpg", "jpeg", "png", "webp"],
+            help="In a future version, vision AI can suggest these details from the photo.",
+        )
+        name = st.text_input("Item name", placeholder="Blue denim jacket")
+        member_id = st.selectbox(
+            "Belongs to",
+            list(member_by_id),
+            format_func=lambda mid: member_by_id[mid].name,
+        )
+        category, color = st.columns(2)
+        with category:
+            item_category = st.selectbox(
+                "Category",
+                ["top", "bottom", "one_piece", "outerwear", "footwear", "accessory"],
+                format_func=lambda value: value.replace("_", " ").title(),
+            )
+        with color:
+            item_color = st.text_input("Color", placeholder="Blue")
+        formality, warmth = st.columns(2)
+        with formality:
+            item_formality = st.selectbox(
+                "Style",
+                ["casual", "smart_casual", "formal", "festive"],
+                format_func=lambda value: value.replace("_", " ").title(),
+            )
+        with warmth:
+            item_warmth = st.selectbox("Warmth", ["light", "medium", "warm"])
+        seasons = st.multiselect(
+            "Seasons", ["spring", "summer", "fall", "winter"], default=["spring", "fall"]
+        )
+        occasion_tags = st.text_input(
+            "Good for", placeholder="school, work, travel, outdoor"
+        )
+        submitted = st.form_submit_button("Add to wardrobe", type="primary")
+
+    if submitted:
+        if not name.strip() or not item_color.strip() or not seasons:
+            st.error("Add an item name, color, and at least one season.")
+            return
+        item_id = f"session_item_{uuid4().hex[:10]}"
+        item = WardrobeItem(
+            id=item_id,
+            member_id=member_id,
+            name=name.strip(),
+            category=item_category,
+            color=item_color.strip().lower(),
+            formality=item_formality,
+            seasons=seasons,
+            warmth=item_warmth,
+            occasion_tags=[tag.strip() for tag in occasion_tags.split(",") if tag.strip()],
+            image_path="session_upload" if photo else None,
+            notes="Added during this prototype session.",
+        )
+        st.session_state["session_wardrobe_items"].append(item.model_dump(mode="json"))
+        if photo:
+            st.session_state["session_wardrobe_images"][item_id] = photo.getvalue()
+        st.session_state["wardrobe_notice"] = f"{item.name} was added for {member_by_id[member_id].name}."
+        st.rerun()
+
+
+@st.dialog("Add an event")
+def add_event_dialog():
+    st.write("Add an occasion now so the family can start planning ahead.")
+    with st.form("add_event_form"):
+        name = st.text_input("Event name", placeholder="Family birthday dinner")
+        event_date, location = st.columns(2)
+        with event_date:
+            date_value = st.date_input("Date")
+        with location:
+            location_value = st.text_input("Location", placeholder="San Jose, CA")
+        participants = st.multiselect(
+            "Who is attending?",
+            list(member_by_id),
+            default=list(member_by_id),
+            format_func=lambda mid: member_by_id[mid].name,
+        )
+        event_type = st.text_input("Occasion type", placeholder="birthday dinner")
+        dress_code, setting = st.columns(2)
+        with dress_code:
+            dress_code_value = st.selectbox(
+                "Dress code",
+                ["casual", "smart_casual", "formal", "festive"],
+                format_func=lambda value: value.replace("_", " ").title(),
+            )
+        with setting:
+            setting_value = st.selectbox("Setting", ["indoor", "outdoor", "mixed"])
+        activities = st.text_input("Activities", placeholder="dinner, photos, walking")
+        expected_weather = st.selectbox(
+            "Expected weather",
+            ["Mild and dry", "Warm and sunny", "Cool with possible rain"],
+        )
+        notes = st.text_area("Anything else the planner should know?", height=80)
+        submitted = st.form_submit_button("Add event", type="primary")
+
+    if submitted:
+        if not name.strip() or not location_value.strip() or not participants:
+            st.error("Add an event name, location, and at least one family member.")
+            return
+        weather_presets = {
+            "Mild and dry": ("mild and dry", 72, 55, 5, 7),
+            "Warm and sunny": ("warm and sunny", 86, 64, 0, 6),
+            "Cool with possible rain": ("cool with possible showers", 61, 49, 45, 14),
+        }
+        event_id = f"session_event_{uuid4().hex[:10]}"
+        weather_key = f"weather_{event_id}"
+        condition, high_f, low_f, rain, wind = weather_presets[expected_weather]
+        event = Event(
+            id=event_id,
+            household_id=dataset.household.id,
+            name=name.strip(),
+            date=date_value,
+            location=location_value.strip(),
+            participant_ids=participants,
+            event_type=event_type.strip() or "family event",
+            dress_code=dress_code_value,
+            setting=setting_value,
+            activities=[activity.strip() for activity in activities.split(",") if activity.strip()]
+            or ["socializing"],
+            weather_key=weather_key,
+            notes=notes.strip() or None,
+        )
+        weather = WeatherSnapshot(
+            key=weather_key,
+            condition=condition,
+            high_f=high_f,
+            low_f=low_f,
+            precipitation_probability=rain,
+            wind_mph=wind,
+        )
+        st.session_state["session_events"].append(event.model_dump(mode="json"))
+        st.session_state["session_weather"].append(weather.model_dump(mode="json"))
+        st.session_state["events_notice"] = f"{event.name} was added and is ready to plan."
+        st.rerun()
+
+
+@st.dialog("Sync your calendar")
+def sync_calendar_dialog():
+    st.write(
+        "Connect a calendar to import upcoming occasions, dates, locations, and attendees. "
+        "You can review every event before wardrobe planning begins."
+    )
+    provider = st.radio("Calendar provider", ["Google Calendar", "Microsoft Outlook"])
+    st.caption("Calendar authorization is represented in this prototype; no account data is accessed.")
+    if st.button("Connect and import events", type="primary", key="connect_calendar"):
+        st.session_state["events_notice"] = (
+            f"{provider} is ready for OAuth integration. No calendar data was accessed."
+        )
+        st.rerun()
 
 
 def illustration(category, color, label=""):
@@ -258,6 +427,12 @@ elif page == "Family":
 elif page == "Wardrobe":
     st.title("Good things, already yours.")
     st.write("Explore your family’s closet, one person at a time.")
+    action, _ = st.columns([1, 4])
+    with action:
+        if st.button("＋ Add item", type="primary", key="add_wardrobe_item"):
+            add_wardrobe_item_dialog()
+    if wardrobe_notice := st.session_state.pop("wardrobe_notice", None):
+        st.success(wardrobe_notice)
     owner, category = st.columns(2)
     with owner:
         selected_member = st.selectbox(
@@ -286,7 +461,11 @@ elif page == "Wardrobe":
     for start in range(0, len(items), 3):
         for column, item in zip(st.columns(3), items[start : start + 3]):
             with column, st.container(border=True):
-                st.html(illustration(item.category, item.color, item.name))
+                uploaded_image = st.session_state["session_wardrobe_images"].get(item.id)
+                if uploaded_image:
+                    st.image(uploaded_image, caption=item.name, use_container_width=True)
+                else:
+                    st.html(illustration(item.category, item.color, item.name))
                 st.markdown(f"**{item.name}**")
                 st.caption(f"{item.color.title()} · {item.formality.replace('_', ' ').title()}")
                 st.write("Available" if item.available else "Unavailable")
@@ -298,6 +477,15 @@ elif page == "Wardrobe":
 elif page == "Events":
     st.title("A little planning. A lighter morning.")
     st.write("Bring the whole family’s outfits together, occasion by occasion.")
+    add_action, sync_action, _ = st.columns([1, 1.2, 3])
+    with add_action:
+        if st.button("＋ Add event", type="primary", key="add_event"):
+            add_event_dialog()
+    with sync_action:
+        if st.button("↻ Sync calendar", key="sync_calendar"):
+            sync_calendar_dialog()
+    if events_notice := st.session_state.pop("events_notice", None):
+        st.success(events_notice)
     for event in sorted(dataset.events, key=lambda e: e.date):
         with st.container(border=True):
             details, action = st.columns([3, 1], vertical_alignment="center")

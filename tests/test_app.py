@@ -28,6 +28,7 @@ def test_overview_and_wardrobe_navigation():
     assert app.title[0].value == "Life happens. Let’s get dressed."
     app.button(key="closet_member_arjun").click().run()
     assert not app.exception
+    assert app.button(key="add_wardrobe_item").label == "＋ Add item"
     assert app.selectbox(key="owner").value == "member_arjun"
     app.selectbox[1].select("footwear").run()
     assert not app.exception
@@ -53,6 +54,8 @@ def test_generate_family_plan_button_completes_workflow():
 def test_event_action_scopes_plan_and_empty_selection_is_disabled():
     app = start()
     app.radio(key="page").set_value("Events").run()
+    assert app.button(key="add_event").label == "＋ Add event"
+    assert app.button(key="sync_calendar").label == "↻ Sync calendar"
     app.button(key="plan_event_school_celebration").click().run()
     assert app.multiselect[0].value == ["event_school_celebration"]
     app.radio[1].set_value("Demo-safe local").run()
@@ -66,6 +69,26 @@ def test_event_action_scopes_plan_and_empty_selection_is_disabled():
     assert result["total_purchase_cost"] == 0
     app.multiselect[0].set_value([]).run()
     assert app.button[0].disabled
+
+
+def test_intake_buttons_open_prototype_forms():
+    wardrobe_app = start()
+    wardrobe_app.radio(key="page").set_value("Wardrobe").run()
+    wardrobe_app.button(key="add_wardrobe_item").click().run()
+    assert not wardrobe_app.exception
+    assert any(field.label == "Item name" for field in wardrobe_app.text_input)
+
+    event_app = start()
+    event_app.radio(key="page").set_value("Events").run()
+    event_app.button(key="add_event").click().run()
+    assert not event_app.exception
+    assert any(field.label == "Event name" for field in event_app.text_input)
+
+    calendar_app = start()
+    calendar_app.radio(key="page").set_value("Events").run()
+    calendar_app.button(key="sync_calendar").click().run()
+    assert not calendar_app.exception
+    assert any(option.label == "Calendar provider" for option in calendar_app.radio)
 
 
 def test_failed_planning_renders_without_empty_columns():
