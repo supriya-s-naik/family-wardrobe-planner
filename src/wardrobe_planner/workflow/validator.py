@@ -11,6 +11,7 @@ def validate_plan(
     dataset: SeedDataset,
     event_ids: list[str],
     retrieved_guidance_ids: set[str] | None = None,
+    required_item_ids: set[str] | None = None,
 ) -> list[str]:
     errors: list[str] = []
     items = {item.id: item for item in dataset.wardrobe_items}
@@ -33,6 +34,34 @@ def validate_plan(
         errors.append(f"Unexpected event/member outfits: {unexpected}")
     if duplicates:
         errors.append(f"Duplicate event/member outfits: {duplicates}")
+
+    for item_id in sorted(required_item_ids or set()):
+        item = items.get(item_id)
+        if item is None:
+            errors.append(f"Unknown required wardrobe item: {item_id}")
+            continue
+        applicable_events = [
+            event for event in events.values() if item.member_id in event.participant_ids
+        ]
+        if not applicable_events:
+            errors.append(
+                f"Required item {item_id} belongs to a member who is not attending selected events"
+            )
+            continue
+        for event in applicable_events:
+            matching_outfit = next(
+                (
+                    outfit
+                    for outfit in plan.outfits
+                    if outfit.event_id == event.id and outfit.member_id == item.member_id
+                ),
+                None,
+            )
+            if matching_outfit is None or item_id not in matching_outfit.item_ids:
+                errors.append(
+                    f"Required wardrobe item {item_id} missing from "
+                    f"{event.id}/{item.member_id}"
+                )
 
     for outfit in plan.outfits:
         selected_categories: set[str] = set()

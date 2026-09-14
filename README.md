@@ -48,7 +48,10 @@ it. In **Plan outfits**, select events and a purchase budget, then generate the 
 Choose **Demo-safe local** under **Planning options** for an offline run. Seeded clothing
 uses category/color illustrations. In **Wardrobe**, an uploaded item photo can be analyzed
 by the Nebius Gemma vision model; the resulting metadata remains editable before saving,
-and the uploaded photo appears on the new item card. Theme settings live in
+and the uploaded photo appears on the new item card. Each wardrobe card also offers
+**Style this item**: **Use if suitable** treats the garment as a preference, while
+**Must use** makes its inclusion a validator-enforced requirement for the selected events.
+Theme settings live in
 `.streamlit/config.toml` and layout styles in `assets/app.css`.
 
 The Nebius smoke test makes two small live calls: one tool-selection check and one strict structured-output check. It never prints the API key. The evaluation command runs 12 deterministic regression cases and writes machine-readable and Markdown reports under `evals/results/`.

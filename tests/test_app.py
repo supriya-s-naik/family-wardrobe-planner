@@ -92,6 +92,30 @@ def test_intake_buttons_open_prototype_forms():
     assert any(option.label == "Calendar provider" for option in calendar_app.radio)
 
 
+def test_style_this_item_can_be_required_in_a_plan():
+    app = start()
+    app.radio(key="page").set_value("Wardrobe").run()
+    app.button(key="style_maya_top_03").click().run()
+    assert not app.exception
+    assert app.session_state["page"] == "Plan outfits"
+    assert any(
+        "Styling around Navy striped T-shirt" in block.value for block in app.markdown
+    )
+
+    app.selectbox(key="style_item_mode").select("Must use").run()
+    app.multiselect(key="selected_events").set_value(["event_coastal_outing"]).run()
+    app.radio[1].set_value("Demo-safe local").run()
+    app.button(key="generate_plan").click().run(timeout=15)
+    app = await_plan(app)
+
+    result = app.session_state["planning_state"]["final_result"]
+    maya_outfit = next(
+        outfit for outfit in result["outfits"] if outfit["member_id"] == "member_maya"
+    )
+    assert result["status"] == "valid"
+    assert "maya_top_03" in maya_outfit["item_ids"]
+
+
 def test_failed_planning_renders_without_empty_columns():
     app = start()
     app.radio(key="page").set_value("Plan outfits").run()

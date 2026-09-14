@@ -154,6 +154,7 @@ def build_planning_graph(
             dataset,
             state["request"]["event_ids"],
             retrieved_guidance_ids=retrieved_guidance_ids,
+            required_item_ids=set(state["request"].get("required_item_ids", [])),
         )
         return {"validation_errors": errors}
 

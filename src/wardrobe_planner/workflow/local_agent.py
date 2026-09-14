@@ -82,6 +82,8 @@ class LocalPlanningAgent:
         guidance = self._guidance(state["tool_results"])
         catalog = self._catalog(state["tool_results"])
         excluded_ids = self._excluded_item_ids(state.get("validation_errors", []))
+        preferred_ids = set(state["request"].get("preferred_item_ids", []))
+        required_ids = set(state["request"].get("required_item_ids", []))
 
         outfits: list[OutfitSelection] = []
         purchases: list[PurchaseRecommendation] = []
@@ -91,10 +93,36 @@ class LocalPlanningAgent:
             snapshot = weather[event.weather_key]
             for member in members:
                 items = [item for item in wardrobe[member.id] if item.id not in excluded_ids]
-                selected = self._select_owned_items(items, event)
+                required_item = next((item for item in items if item.id in required_ids), None)
+                preferred_item = next((item for item in items if item.id in preferred_ids), None)
+                preferred_is_suitable = False
+                preference_reason = ""
+                if preferred_item is not None:
+                    preferred_is_suitable, preference_reason = self._preferred_item_fit(
+                        preferred_item, event, snapshot
+                    )
+                featured_item = required_item or (
+                    preferred_item if preferred_is_suitable else None
+                )
+                selected = self._select_owned_items(items, event, featured_item)
                 rationale_parts = [
                     f"Uses {len(selected)} available owned items for {event.dress_code.replace('_', ' ')} conditions."
                 ]
+                if required_item is not None:
+                    rationale_parts.append(
+                        f"Includes the required wardrobe item {required_item.name}."
+                    )
+                elif preferred_item is not None:
+                    if preferred_is_suitable:
+                        rationale_parts.append(
+                            f"Uses the preferred wardrobe item {preferred_item.name}; "
+                            f"{preference_reason}."
+                        )
+                    else:
+                        rationale_parts.append(
+                            f"Considered {preferred_item.name} but skipped it because "
+                            f"{preference_reason}."
+                        )
 
                 if (
                     event.setting in {"outdoor", "mixed"}
@@ -205,7 +233,11 @@ class LocalPlanningAgent:
         }
 
     @staticmethod
-    def _select_owned_items(items: list[WardrobeItem], event: Event) -> list[WardrobeItem]:
+    def _select_owned_items(
+        items: list[WardrobeItem],
+        event: Event,
+        featured_item: WardrobeItem | None = None,
+    ) -> list[WardrobeItem]:
         def first(category: str, formalities: tuple[str, ...]) -> WardrobeItem | None:
             for formality in formalities:
                 for item in items:
@@ -221,27 +253,34 @@ class LocalPlanningAgent:
             priorities = ("casual", "smart_casual")
 
         selected: list[WardrobeItem] = []
-        one_piece = first("one_piece", priorities)
-        if one_piece:
-            selected.append(one_piece)
-        else:
-            for category in ("top", "bottom"):
-                item = first(category, priorities)
-                if item:
-                    selected.append(item)
 
-        footwear = first("footwear", priorities)
-        if footwear:
-            selected.append(footwear)
+        def add(item: WardrobeItem | None) -> None:
+            if item is not None and item.id not in {selected_item.id for selected_item in selected}:
+                selected.append(item)
+
+        if featured_item is not None and featured_item.category == "one_piece":
+            add(featured_item)
+        elif featured_item is not None and featured_item.category in {"top", "bottom"}:
+            add(featured_item)
+            counterpart = "bottom" if featured_item.category == "top" else "top"
+            add(first(counterpart, priorities))
+        else:
+            one_piece = first("one_piece", priorities)
+            if one_piece:
+                add(one_piece)
+            else:
+                for category in ("top", "bottom"):
+                    add(first(category, priorities))
+
+        if featured_item is not None and featured_item.category == "footwear":
+            add(featured_item)
+        else:
+            add(first("footwear", priorities))
 
         if event.dress_code == "festive":
-            accessory = first("accessory", priorities)
-            if accessory:
-                selected.append(accessory)
+            add(first("accessory", priorities))
         elif event.dress_code == "smart_casual":
-            outerwear = first("outerwear", priorities)
-            if outerwear:
-                selected.append(outerwear)
+            add(first("outerwear", priorities))
         elif event.setting in {"outdoor", "mixed"}:
             rainy_outerwear = next(
                 (
@@ -251,10 +290,45 @@ class LocalPlanningAgent:
                 ),
                 None,
             )
-            if rainy_outerwear:
-                selected.append(rainy_outerwear)
+            add(rainy_outerwear)
+
+        if featured_item is not None and featured_item.category in {"outerwear", "accessory"}:
+            add(featured_item)
 
         return selected
+
+    @staticmethod
+    def _preferred_item_fit(
+        item: WardrobeItem,
+        event: Event,
+        weather: dict[str, Any],
+    ) -> tuple[bool, str]:
+        if event.dress_code != "festive" and item.formality == "festive":
+            return False, f"its festive style does not match the {event.dress_code} dress code"
+        month_to_season = {
+            1: "winter",
+            2: "winter",
+            3: "spring",
+            4: "spring",
+            5: "spring",
+            6: "summer",
+            7: "summer",
+            8: "summer",
+            9: "fall",
+            10: "fall",
+            11: "fall",
+            12: "winter",
+        }
+        expected_season = month_to_season[event.date.month]
+        high_f = int(weather.get("high_f", 70))
+        if high_f >= 78:
+            expected_season = "summer"
+        elif high_f <= 48:
+            expected_season = "winter"
+        if expected_season not in item.seasons:
+            seasons = "/".join(item.seasons)
+            return False, f"its {seasons} season profile does not match {expected_season} conditions"
+        return True, f"it matches the {event.dress_code} dress code and {expected_season} conditions"
 
     @staticmethod
     def _select_rain_product(

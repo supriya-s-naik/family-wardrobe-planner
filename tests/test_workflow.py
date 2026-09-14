@@ -84,6 +84,40 @@ def test_validator_rejects_guidance_that_was_not_retrieved() -> None:
     assert any("was not retrieved" in error for error in errors)
 
 
+def test_validator_rejects_missing_required_wardrobe_item() -> None:
+    dataset = load_seed_dataset(SEED_DIR)
+    dataset.demo_request.event_ids = ["event_school_celebration"]
+    state = run_demo_workflow(dataset)
+    result = deepcopy(state["final_result"])
+    result.pop("validation_errors")
+    result.pop("workflow_metrics")
+
+    errors = validate_plan(
+        OutfitPlan.model_validate(result),
+        dataset,
+        dataset.demo_request.event_ids,
+        required_item_ids={"maya_top_03"},
+    )
+
+    assert any("Required wardrobe item maya_top_03 missing" in error for error in errors)
+
+
+def test_local_planner_honors_required_wardrobe_item() -> None:
+    dataset = load_seed_dataset(SEED_DIR)
+    dataset.demo_request.event_ids = ["event_coastal_outing"]
+    dataset.demo_request.required_item_ids = ["maya_top_03"]
+
+    state = run_demo_workflow(dataset)
+    result = state["final_result"]
+    maya_outfit = next(
+        outfit for outfit in result["outfits"] if outfit["member_id"] == "member_maya"
+    )
+
+    assert result["status"] == "valid"
+    assert "maya_top_03" in maya_outfit["item_ids"]
+    assert "required wardrobe item" in maya_outfit["rationale"]
+
+
 def test_nebius_agent_backend_drives_the_same_graph_contract() -> None:
     dataset = load_seed_dataset(SEED_DIR)
     local_state = run_demo_workflow(dataset)

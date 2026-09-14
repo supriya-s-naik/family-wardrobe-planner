@@ -93,6 +93,22 @@ def validate_references(dataset: SeedDataset) -> None:
     unknown_events = sorted(set(dataset.demo_request.event_ids) - set(event_ids))
     if unknown_events:
         raise ValueError(f"Demo request references unknown events: {unknown_events}")
+    requested_item_ids = {
+        *dataset.demo_request.preferred_item_ids,
+        *dataset.demo_request.required_item_ids,
+    }
+    unknown_requested_items = sorted(requested_item_ids - set(item_ids))
+    if unknown_requested_items:
+        raise ValueError(
+            f"Demo request references unknown wardrobe items: {unknown_requested_items}"
+        )
+    overlapping_requests = sorted(
+        set(dataset.demo_request.preferred_item_ids)
+        & set(dataset.demo_request.required_item_ids)
+    )
+    if overlapping_requests:
+        raise ValueError(
+            f"Wardrobe items cannot be both preferred and required: {overlapping_requests}"
+        )
     if dataset.demo_request.purchase_budget > dataset.household.planning_budget:
         raise ValueError("Demo request budget exceeds the household planning budget")
-

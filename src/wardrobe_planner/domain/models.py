@@ -108,6 +108,8 @@ class DemoRequest(BaseModel):
     event_ids: list[str] = Field(min_length=1)
     user_message: str
     purchase_budget: float = Field(ge=0)
+    preferred_item_ids: list[str] = Field(default_factory=list)
+    required_item_ids: list[str] = Field(default_factory=list)
 
 
 class SeedDataset(BaseModel):

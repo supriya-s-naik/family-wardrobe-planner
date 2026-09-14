@@ -13,7 +13,7 @@ from wardrobe_planner.domain.models import Event, WardrobeItem, WeatherSnapshot
 from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workflow
 
 ROOT = Path(__file__).resolve().parent
-APP_STATE_VERSION = "multimodal-intake-v8"
+APP_STATE_VERSION = "style-item-request-v9"
 st.set_page_config(
     page_title="Everyday / together · Wardrobe Planner", page_icon="🌿", layout="wide"
 )
@@ -92,6 +92,17 @@ def navigate(page, event_id=None):
 def open_wardrobe(member_id):
     st.session_state["owner"] = member_id
     navigate("Wardrobe")
+
+
+def style_item(item_id):
+    st.session_state["style_item_id"] = item_id
+    st.session_state["style_item_mode"] = "Use if suitable"
+    navigate("Plan outfits")
+
+
+def clear_style_item():
+    st.session_state.pop("style_item_id", None)
+    st.session_state.pop("style_item_mode", None)
 
 
 WARDROBE_FORM_KEYS = (
@@ -369,6 +380,9 @@ def family_cards():
 
 def render_results(state):
     result = state["final_result"]
+    preferred_item_ids = set(state["request"].get("preferred_item_ids", []))
+    required_item_ids = set(state["request"].get("required_item_ids", []))
+    styled_item_ids = preferred_item_ids | required_item_ids
     if result["status"] == "valid":
         st.success(
             f"Your family plan is ready · ${result['total_purchase_cost']:.0f} in suggested purchases"
@@ -387,8 +401,19 @@ def render_results(state):
                 st.markdown(f"### {member_by_id[outfit['member_id']].name}")
                 st.caption("FROM YOUR WARDROBE")
                 for item_id in outfit["item_ids"]:
-                    st.write("• " + item_by_id[item_id].name)
+                    marker = "★ " if item_id in styled_item_ids else "• "
+                    st.write(marker + item_by_id[item_id].name)
                 st.caption(outfit["rationale"])
+    used_item_ids = {
+        item_id for outfit in result.get("outfits", []) for item_id in outfit["item_ids"]
+    }
+    for preferred_item_id in preferred_item_ids - used_item_ids:
+        preferred_item = item_by_id.get(preferred_item_id)
+        if preferred_item is not None:
+            st.info(
+                f"{preferred_item.name} was considered but not selected under “Use if suitable.” "
+                "Choose “Must use” to make it a validated requirement."
+            )
     if result.get("purchases"):
         st.subheader("A few missing pieces")
         st.caption("Suggestions from the sample catalog. Nothing is purchased automatically.")
@@ -561,6 +586,12 @@ elif page == "Wardrobe":
                     st.write("**Occasions:** " + ", ".join(item.occasion_tags))
                     if item.notes:
                         st.write(item.notes)
+                st.button(
+                    "Style this item →",
+                    key=f"style_{item.id}",
+                    on_click=style_item,
+                    args=(item.id,),
+                )
 elif page == "Events":
     st.title("A little planning. A lighter morning.")
     st.write("Bring the whole family’s outfits together, occasion by occasion.")
@@ -597,6 +628,35 @@ else:
     st.write(
         "Choose your occasions. We’ll start with your wardrobe and highlight any missing pieces."
     )
+    styled_item_id = st.session_state.get("style_item_id")
+    styled_item = item_by_id.get(styled_item_id)
+    if styled_item_id and styled_item is None:
+        clear_style_item()
+        styled_item_id = None
+    if styled_item is not None:
+        with st.container(border=True):
+            item_details, item_action = st.columns([4, 1], vertical_alignment="center")
+            with item_details:
+                owner_name = member_by_id[styled_item.member_id].name
+                st.markdown(f"**Styling around {styled_item.name} for {owner_name}**")
+                st.caption(
+                    f"{styled_item.color.title()} · "
+                    f"{styled_item.formality.replace('_', ' ').title()} · "
+                    f"{', '.join(styled_item.seasons).title()}"
+                )
+            with item_action:
+                st.button("Remove", key="clear_style_item", on_click=clear_style_item)
+            style_item_mode = st.selectbox(
+                "How should the planner use it?",
+                ["Use if suitable", "Must use"],
+                key="style_item_mode",
+                help=(
+                    "Use if suitable is a preference the planner may decline with a reason. "
+                    "Must use is a hard constraint checked by the validator."
+                ),
+            )
+    else:
+        style_item_mode = "Use if suitable"
     st.session_state.setdefault("selected_events", dataset.demo_request.event_ids)
     selected_events = st.multiselect(
         "What are you dressing for?",
@@ -611,6 +671,12 @@ else:
         "Planning for: "
         + (", ".join(member_by_id[mid].name for mid in participants) or "Choose an event above")
     )
+    style_item_applies = styled_item is None or styled_item.member_id in participants
+    if styled_item is not None and not style_item_applies:
+        st.warning(
+            f"Choose an event attended by {member_by_id[styled_item.member_id].name} "
+            f"to style {styled_item.name}."
+        )
     budget = st.number_input(
         "Maximum budget for new items ($)",
         min_value=0.0,
@@ -637,17 +703,36 @@ else:
     if st.button(
         "Generate family plan",
         type="primary",
-        disabled=not selected_events or job_running,
+        disabled=not selected_events or job_running or not style_item_applies,
+        key="generate_plan",
     ):
         st.session_state.pop("planning_state", None)
         st.session_state.pop("planning_error", None)
         request_dataset = dataset.model_copy(deep=True)
         request_dataset.demo_request.event_ids = selected_events
         request_dataset.demo_request.purchase_budget = budget
+        request_dataset.demo_request.preferred_item_ids = []
+        request_dataset.demo_request.required_item_ids = []
+        item_instruction = ""
+        if styled_item is not None:
+            if style_item_mode == "Must use":
+                request_dataset.demo_request.required_item_ids = [styled_item.id]
+                item_instruction = (
+                    f" Required constraint: use {styled_item.name} ({styled_item.id}) in every "
+                    f"selected outfit for {member_by_id[styled_item.member_id].name}."
+                )
+            else:
+                request_dataset.demo_request.preferred_item_ids = [styled_item.id]
+                item_instruction = (
+                    f" Prefer {styled_item.name} ({styled_item.id}) for "
+                    f"{member_by_id[styled_item.member_id].name} when it suits the event and "
+                    "conditions; otherwise explain why it was skipped."
+                )
         request_dataset.demo_request.user_message = (
             "Plan outfits for "
             + ", ".join(event_by_id[eid].name for eid in selected_events)
             + f". Use owned items first, coordinate without identical outfits, and keep all suggested purchases within ${budget:.0f} total."
+            + item_instruction
         )
         runner = run_nebius_workflow if backend == "Nebius live" else run_demo_workflow
         st.session_state["planning_job"] = planning_executor().submit(runner, request_dataset)
@@ -663,7 +748,22 @@ else:
             st.info("The app was updated. Generate a fresh plan to continue.")
         else:
             request = planning_state["request"]
-            if request["event_ids"] == selected_events and request["purchase_budget"] == budget:
+            expected_preferred = (
+                [styled_item.id]
+                if styled_item is not None and style_item_mode == "Use if suitable"
+                else []
+            )
+            expected_required = (
+                [styled_item.id]
+                if styled_item is not None and style_item_mode == "Must use"
+                else []
+            )
+            if (
+                request["event_ids"] == selected_events
+                and request["purchase_budget"] == budget
+                and request.get("preferred_item_ids", []) == expected_preferred
+                and request.get("required_item_ids", []) == expected_required
+            ):
                 render_results(planning_state)
             else:
                 st.info(
