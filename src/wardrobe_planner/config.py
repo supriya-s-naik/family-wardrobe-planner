@@ -11,6 +11,7 @@ class Settings:
     nebius_api_key: str
     nebius_base_url: str
     nebius_model: str
+    nebius_vision_model: str = "google/gemma-3-27b-it"
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -26,5 +27,7 @@ class Settings:
             nebius_api_key=os.environ["NEBIUS_API_KEY"],
             nebius_base_url=os.environ["NEBIUS_BASE_URL"].rstrip("/") + "/",
             nebius_model=os.environ["NEBIUS_MODEL"],
+            nebius_vision_model=os.getenv(
+                "NEBIUS_VISION_MODEL", "google/gemma-3-27b-it"
+            ),
         )
-

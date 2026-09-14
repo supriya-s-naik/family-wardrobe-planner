@@ -35,6 +35,7 @@ flowchart LR
 
     subgraph AI[AI services]
         NEBIUS[Nebius Token Factory<br/>open-weight planning model]
+        VISION[Nebius Token Factory<br/>Gemma vision model]
         PINECONE[Pinecone<br/>style-guidance RAG]
         MEM0[Mem0<br/>cross-session preferences]
     end
@@ -49,6 +50,8 @@ flowchart LR
     OBS[LangSmith<br/>traces and evaluations]
 
     U -->|Profiles, events, requests, feedback| UI
+    UI -->|Uploaded garment photo| VISION
+    VISION -->|Editable metadata suggestions| UI
     UI -->|Planning request| INTAKE
     PRESENT -->|Outfit plan, evidence, warnings| UI
     CONTEXT <--> TOOLS
@@ -75,6 +78,10 @@ The application uses a hybrid workflow. LangGraph controls the required sequence
 
 The model never becomes the source of truth for inventory, availability, events, or budget. Those facts come from SQLite through typed tools. This lets deterministic code reject hallucinated item IDs and other hard-constraint violations before a plan reaches the user.
 
+Wardrobe intake uses a separate Nebius Gemma vision model. It proposes structured metadata
+from an uploaded photo, but the user reviews and edits every field before the application
+creates an authoritative wardrobe item.
+
 ## Component responsibilities
 
 | Component | Responsibility | Must not be used for |
@@ -82,6 +89,7 @@ The model never becomes the source of truth for inventory, availability, events,
 | Streamlit | Household setup, wardrobe and event views, planning request, plan display, feedback | Business-rule enforcement |
 | LangGraph | State transitions, retry limits, tool loop, failure routing | Long-term authoritative storage |
 | Nebius model | Contextual reasoning, outfit generation, purchase decisions, explanations, typed plan submission | Deciding whether hard constraints passed |
+| Nebius vision model | Suggesting editable wardrobe metadata from one uploaded item photo | Saving inventory without user review |
 | Typed tool layer | Stable boundary between the agent and application services | Free-form database access by the model |
 | SQLite | Source of truth for household members, wardrobe, events, budgets, plans | Semantic style guidance |
 | Pinecone | Semantic retrieval of reviewed styling and dress-code guidance | Inventory, prices, or member ownership |

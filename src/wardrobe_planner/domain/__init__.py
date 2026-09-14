@@ -6,6 +6,7 @@ from wardrobe_planner.domain.models import (
     GuidanceDocument,
     Household,
     SeedDataset,
+    WardrobeImageAnalysis,
     WardrobeItem,
     WeatherSnapshot,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "OutfitSelection",
     "PurchaseRecommendation",
     "SeedDataset",
+    "WardrobeImageAnalysis",
     "WardrobeItem",
     "WeatherSnapshot",
 ]

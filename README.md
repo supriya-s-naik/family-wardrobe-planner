@@ -12,6 +12,7 @@ The repository currently contains the product requirements, architecture, a runn
 - [Architecture](docs/ARCHITECTURE.md)
 - [Architecture infographic](docs/assets/wardrobe-planner-architecture-user-flow-v2.png)
 - [Nebius model spike](docs/MODEL_SPIKE.md)
+- [Multimodal wardrobe intake](docs/MULTIMODAL_INTAKE.md)
 - [Evaluation approach](docs/EVALUATION.md)
 - [Latest evaluation results](evals/results/latest.md)
 - [LangSmith evaluation evidence](evals/results/langsmith.md)
@@ -32,6 +33,7 @@ uv sync --extra dev
 uv run python scripts/validate_seed.py
 uv run python scripts/index_guidance.py
 uv run python scripts/smoke_test_nebius.py
+uv run python scripts/smoke_test_vision.py path\to\garment.jpg
 uv run --offline python scripts/run_evals.py
 uv run --offline python scripts/run_langsmith_evals.py
 uv run --offline python scripts/run_model_judge.py --case coastal_standard
@@ -43,8 +45,10 @@ Copy `.env.example` to `.env` before connecting managed services. The current da
 The interface opens on an occasion-focused overview with family preference cards. Browse
 the visual wardrobe by person and category, or use an event's planning action to preselect
 it. In **Plan outfits**, select events and a purchase budget, then generate the plan.
-Choose **Demo-safe local** under **Planning options** for an offline run. Clothing visuals
-are category/color illustrations, not item photos. Theme settings live in
+Choose **Demo-safe local** under **Planning options** for an offline run. Seeded clothing
+uses category/color illustrations. In **Wardrobe**, an uploaded item photo can be analyzed
+by the Nebius Gemma vision model; the resulting metadata remains editable before saving,
+and the uploaded photo appears on the new item card. Theme settings live in
 `.streamlit/config.toml` and layout styles in `assets/app.css`.
 
 The Nebius smoke test makes two small live calls: one tool-selection check and one strict structured-output check. It never prints the API key. The evaluation command runs 12 deterministic regression cases and writes machine-readable and Markdown reports under `evals/results/`.
@@ -70,7 +74,7 @@ tests/test_evaluation.py       Evaluation-suite regression check
 
 ## Planned integrations
 
-- Nebius Token Factory for the open-weight planning model
+- Nebius Token Factory for open-weight planning and wardrobe-image understanding
 - LangGraph for the bounded tool-calling workflow
 - Pinecone for styling-guidance RAG
 - Mem0 for cross-session family-member preferences

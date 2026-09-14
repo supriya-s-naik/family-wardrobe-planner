@@ -42,6 +42,18 @@ class WardrobeItem(BaseModel):
     notes: str | None = None
 
 
+class WardrobeImageAnalysis(BaseModel):
+    name: str
+    category: Literal["top", "bottom", "one_piece", "outerwear", "footwear", "accessory"]
+    color: str
+    formality: Literal["casual", "smart_casual", "formal", "festive"]
+    seasons: list[Literal["spring", "summer", "fall", "winter"]]
+    warmth: Literal["light", "medium", "warm"]
+    occasion_tags: list[str]
+    description: str
+    confidence: float = Field(ge=0, le=1)
+
+
 class Event(BaseModel):
     id: str
     household_id: str
@@ -107,4 +119,3 @@ class SeedDataset(BaseModel):
     catalog_items: list[CatalogItem]
     guidance_documents: list[GuidanceDocument]
     demo_request: DemoRequest
-

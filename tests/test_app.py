@@ -76,6 +76,7 @@ def test_intake_buttons_open_prototype_forms():
     wardrobe_app.radio(key="page").set_value("Wardrobe").run()
     wardrobe_app.button(key="add_wardrobe_item").click().run()
     assert not wardrobe_app.exception
+    assert wardrobe_app.button(key="analyze_wardrobe_photo").disabled
     assert any(field.label == "Item name" for field in wardrobe_app.text_input)
 
     event_app = start()

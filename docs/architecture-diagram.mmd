@@ -24,6 +24,7 @@ flowchart LR
 
     subgraph AI[AI services]
         NEBIUS[Nebius Token Factory<br/>open-weight planning model]
+        VISION[Nebius Token Factory<br/>Gemma vision model]
         PINECONE[Pinecone<br/>style-guidance RAG]
         MEM0[Mem0<br/>cross-session preferences]
     end
@@ -38,6 +39,8 @@ flowchart LR
     OBS[LangSmith<br/>traces and evaluations]
 
     U -->|Profiles, events, requests, feedback| UI
+    UI -->|Uploaded garment photo| VISION
+    VISION -->|Editable metadata suggestions| UI
     UI -->|Planning request| INTAKE
     PRESENT -->|Outfit plan, evidence, warnings| UI
     CONTEXT <--> TOOLS

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from typing import Any
 
@@ -7,7 +8,11 @@ from openai import OpenAI
 from pydantic import BaseModel
 
 from wardrobe_planner.config import Settings
+from wardrobe_planner.domain.models import WardrobeImageAnalysis
 from wardrobe_planner.domain.plans import ToolSmokeResult
+
+SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
 
 
 class NebiusModel:
@@ -55,6 +60,65 @@ class NebiusModel:
             actual_tool=call.function.name,
             arguments=arguments,
         )
+
+    def analyze_wardrobe_image(
+        self, *, image_bytes: bytes, media_type: str
+    ) -> WardrobeImageAnalysis:
+        if media_type not in SUPPORTED_IMAGE_TYPES:
+            raise ValueError("Use a JPG, PNG, or WebP image.")
+        if not image_bytes:
+            raise ValueError("The uploaded image is empty.")
+        if len(image_bytes) > MAX_IMAGE_BYTES:
+            raise ValueError("The uploaded image must be 8 MB or smaller.")
+
+        encoded = base64.b64encode(image_bytes).decode("ascii")
+        schema = _strict_json_schema(WardrobeImageAnalysis.model_json_schema())
+        response = self.client.chat.completions.create(
+            model=self.settings.nebius_vision_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You analyze one visible garment, shoe, or accessory for a family wardrobe. "
+                        "Describe only what the image supports. Choose the closest allowed category, "
+                        "formality, seasons, and warmth. Keep the name short and occasion tags practical. "
+                        "Confidence must reflect image clarity."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Identify the main wardrobe item in this photo. Return structured "
+                                "metadata for a user to review before saving."
+                            ),
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{media_type};base64,{encoded}",
+                            },
+                        },
+                    ],
+                },
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "wardrobe_image_analysis",
+                    "strict": True,
+                    "schema": schema,
+                },
+            },
+            temperature=0,
+            max_tokens=800,
+        )
+        content = response.choices[0].message.content
+        if not content:
+            raise RuntimeError("Nebius returned no wardrobe image analysis")
+        return WardrobeImageAnalysis.model_validate_json(content)
 
     def decide_tool(
         self,

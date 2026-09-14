@@ -1,17 +1,19 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from hashlib import sha256
 from html import escape
 from pathlib import Path
 from uuid import uuid4
 
 import streamlit as st
 
+from wardrobe_planner.adapters.nebius import NebiusModel
 from wardrobe_planner.data.seed_loader import load_seed_dataset
 from wardrobe_planner.domain.models import Event, WardrobeItem, WeatherSnapshot
 from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workflow
 
 ROOT = Path(__file__).resolve().parent
-APP_STATE_VERSION = "wardrobe-event-intake-v7"
+APP_STATE_VERSION = "multimodal-intake-v8"
 st.set_page_config(
     page_title="Everyday / together · Wardrobe Planner", page_icon="🌿", layout="wide"
 )
@@ -26,6 +28,7 @@ st.session_state.setdefault("session_wardrobe_items", [])
 st.session_state.setdefault("session_wardrobe_images", {})
 st.session_state.setdefault("session_events", [])
 st.session_state.setdefault("session_weather", [])
+st.session_state.setdefault("wardrobe_image_analysis_cache", {})
 dataset.wardrobe_items.extend(
     WardrobeItem.model_validate(item) for item in st.session_state["session_wardrobe_items"]
 )
@@ -91,16 +94,89 @@ def open_wardrobe(member_id):
     navigate("Wardrobe")
 
 
+WARDROBE_FORM_KEYS = (
+    "new_item_name",
+    "new_item_category",
+    "new_item_color",
+    "new_item_formality",
+    "new_item_warmth",
+    "new_item_seasons",
+    "new_item_occasion_tags",
+)
+
+
+def reset_wardrobe_intake():
+    for key in WARDROBE_FORM_KEYS:
+        st.session_state.pop(key, None)
+    st.session_state.pop("new_item_photo", None)
+    st.session_state.pop("wardrobe_intake_image_hash", None)
+
+
+def apply_wardrobe_analysis(analysis):
+    st.session_state["new_item_name"] = analysis["name"]
+    st.session_state["new_item_category"] = analysis["category"]
+    st.session_state["new_item_color"] = analysis["color"]
+    st.session_state["new_item_formality"] = analysis["formality"]
+    st.session_state["new_item_warmth"] = analysis["warmth"]
+    st.session_state["new_item_seasons"] = analysis["seasons"]
+    st.session_state["new_item_occasion_tags"] = ", ".join(analysis["occasion_tags"])
+
+
 @st.dialog("Add a wardrobe item")
 def add_wardrobe_item_dialog():
-    st.write("Upload a photo and add a few details so the planner can use this piece.")
+    st.write("Upload a photo, let AI suggest the details, and review them before saving.")
+    photo = st.file_uploader(
+        "Garment or accessory photo",
+        type=["jpg", "jpeg", "png", "webp"],
+        help="Use one clear garment, pair of shoes, or accessory per photo; maximum 8 MB.",
+        key="new_item_photo",
+    )
+    analysis = None
+    image_bytes = photo.getvalue() if photo else b""
+    image_hash = sha256(image_bytes).hexdigest() if image_bytes else None
+    if image_hash and st.session_state.get("wardrobe_intake_image_hash") != image_hash:
+        for key in WARDROBE_FORM_KEYS:
+            st.session_state.pop(key, None)
+        st.session_state["wardrobe_intake_image_hash"] = image_hash
+
+    cached_analysis = st.session_state["wardrobe_image_analysis_cache"].get(image_hash)
+    if cached_analysis:
+        analysis = cached_analysis
+        if "new_item_name" not in st.session_state:
+            apply_wardrobe_analysis(analysis)
+    if photo:
+        st.image(image_bytes, caption="Photo to analyze", width=220)
+    if st.button(
+        "✨ Analyze photo with AI",
+        disabled=not photo,
+        key="analyze_wardrobe_photo",
+    ):
+        try:
+            with st.spinner("Reading the garment and suggesting details…"):
+                analysis_model = NebiusModel().analyze_wardrobe_image(
+                    image_bytes=image_bytes,
+                    media_type=photo.type,
+                )
+            analysis = analysis_model.model_dump(mode="json")
+            st.session_state["wardrobe_image_analysis_cache"][image_hash] = analysis
+            apply_wardrobe_analysis(analysis)
+        except Exception:  # noqa: BLE001 -- Manual intake remains available after provider errors.
+            st.error("Photo analysis couldn’t finish. Try again or enter the details manually.")
+
+    if analysis:
+        st.success(f"AI suggestions ready · {analysis['confidence']:.0%} confidence")
+        st.caption(analysis["description"] + " Review and correct any detail before saving.")
+
+    st.session_state.setdefault("new_item_name", "")
+    st.session_state.setdefault("new_item_category", "top")
+    st.session_state.setdefault("new_item_color", "")
+    st.session_state.setdefault("new_item_formality", "casual")
+    st.session_state.setdefault("new_item_warmth", "light")
+    st.session_state.setdefault("new_item_seasons", ["spring", "fall"])
+    st.session_state.setdefault("new_item_occasion_tags", "")
+
     with st.form("add_wardrobe_item_form"):
-        photo = st.file_uploader(
-            "Garment or accessory photo",
-            type=["jpg", "jpeg", "png", "webp"],
-            help="In a future version, vision AI can suggest these details from the photo.",
-        )
-        name = st.text_input("Item name", placeholder="Blue denim jacket")
+        name = st.text_input("Item name", placeholder="Blue denim jacket", key="new_item_name")
         member_id = st.selectbox(
             "Belongs to",
             list(member_by_id),
@@ -112,23 +188,31 @@ def add_wardrobe_item_dialog():
                 "Category",
                 ["top", "bottom", "one_piece", "outerwear", "footwear", "accessory"],
                 format_func=lambda value: value.replace("_", " ").title(),
+                key="new_item_category",
             )
         with color:
-            item_color = st.text_input("Color", placeholder="Blue")
+            item_color = st.text_input("Color", placeholder="Blue", key="new_item_color")
         formality, warmth = st.columns(2)
         with formality:
             item_formality = st.selectbox(
                 "Style",
                 ["casual", "smart_casual", "formal", "festive"],
                 format_func=lambda value: value.replace("_", " ").title(),
+                key="new_item_formality",
             )
         with warmth:
-            item_warmth = st.selectbox("Warmth", ["light", "medium", "warm"])
+            item_warmth = st.selectbox(
+                "Warmth", ["light", "medium", "warm"], key="new_item_warmth"
+            )
         seasons = st.multiselect(
-            "Seasons", ["spring", "summer", "fall", "winter"], default=["spring", "fall"]
+            "Seasons",
+            ["spring", "summer", "fall", "winter"],
+            key="new_item_seasons",
         )
         occasion_tags = st.text_input(
-            "Good for", placeholder="school, work, travel, outdoor"
+            "Good for",
+            placeholder="school, work, travel, outdoor",
+            key="new_item_occasion_tags",
         )
         submitted = st.form_submit_button("Add to wardrobe", type="primary")
 
@@ -430,6 +514,7 @@ elif page == "Wardrobe":
     action, _ = st.columns([1, 4])
     with action:
         if st.button("＋ Add item", type="primary", key="add_wardrobe_item"):
+            reset_wardrobe_intake()
             add_wardrobe_item_dialog()
     if wardrobe_notice := st.session_state.pop("wardrobe_notice", None):
         st.success(wardrobe_notice)
