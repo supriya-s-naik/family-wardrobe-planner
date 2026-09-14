@@ -10,6 +10,7 @@ dependencies = [
   "langgraph>=0.2",
   "langsmith>=0.1",
   "mem0ai>=0.1",
+  "pillow>=10",
   "pinecone>=10,<11",
   "pydantic>=2.8",
   "python-dotenv>=1.0",

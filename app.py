@@ -160,8 +160,10 @@ def add_wardrobe_item_dialog():
             analysis = analysis_model.model_dump(mode="json")
             st.session_state["wardrobe_image_analysis_cache"][image_hash] = analysis
             apply_wardrobe_analysis(analysis)
-        except Exception:  # noqa: BLE001 -- Manual intake remains available after provider errors.
+        except Exception as error:  # noqa: BLE001 -- Keep manual intake after provider errors.
             st.error("Photo analysis couldn’t finish. Try again or enter the details manually.")
+            with st.expander("Technical details"):
+                st.code(f"{type(error).__name__}: {error}")
 
     if analysis:
         st.success(f"AI suggestions ready · {analysis['confidence']:.0%} confidence")

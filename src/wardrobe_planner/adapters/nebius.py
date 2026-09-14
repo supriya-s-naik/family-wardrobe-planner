@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import base64
 import json
+from io import BytesIO
 from typing import Any
 
-from openai import OpenAI
+from openai import APIConnectionError, APITimeoutError, OpenAI, RateLimitError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel
 
 from wardrobe_planner.config import Settings
@@ -13,6 +15,7 @@ from wardrobe_planner.domain.plans import ToolSmokeResult
 
 SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_IMAGE_DIMENSION = 1536
 
 
 class NebiusModel:
@@ -71,50 +74,63 @@ class NebiusModel:
         if len(image_bytes) > MAX_IMAGE_BYTES:
             raise ValueError("The uploaded image must be 8 MB or smaller.")
 
-        encoded = base64.b64encode(image_bytes).decode("ascii")
+        normalized_image = _normalize_image(image_bytes)
+        encoded = base64.b64encode(normalized_image).decode("ascii")
         schema = _strict_json_schema(WardrobeImageAnalysis.model_json_schema())
-        response = self.client.chat.completions.create(
-            model=self.settings.nebius_vision_model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You analyze one visible garment, shoe, or accessory for a family wardrobe. "
-                        "Describe only what the image supports. Choose the closest allowed category, "
-                        "formality, seasons, and warmth. Keep the name short and occasion tags practical. "
-                        "Confidence must reflect image clarity."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": [
+        response = None
+        for attempt in range(2):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.settings.nebius_vision_model,
+                    messages=[
                         {
-                            "type": "text",
-                            "text": (
-                                "Identify the main wardrobe item in this photo. Return structured "
-                                "metadata for a user to review before saving."
+                            "role": "system",
+                            "content": (
+                                "You analyze one visible garment, shoe, or accessory for a family "
+                                "wardrobe. Describe only what the image supports. Use one_piece for "
+                                "dresses, jumpsuits, and other garments covering both torso and lower "
+                                "body; use top only for shirts, blouses, sweaters, and similar upper-body "
+                                "pieces. Choose the closest allowed formality, seasons, and warmth. Keep "
+                                "the name short and occasion tags practical. Confidence must reflect "
+                                "image clarity and classification certainty."
                             ),
                         },
                         {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{media_type};base64,{encoded}",
-                            },
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": (
+                                        "Identify the main wardrobe item in this photo. Return structured "
+                                        "metadata for a user to review before saving."
+                                    ),
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{encoded}",
+                                    },
+                                },
+                            ],
                         },
                     ],
-                },
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "wardrobe_image_analysis",
-                    "strict": True,
-                    "schema": schema,
-                },
-            },
-            temperature=0,
-            max_tokens=800,
-        )
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "wardrobe_image_analysis",
+                            "strict": True,
+                            "schema": schema,
+                        },
+                    },
+                    temperature=0,
+                    max_tokens=800,
+                )
+                break
+            except (APIConnectionError, APITimeoutError, RateLimitError):
+                if attempt == 1:
+                    raise
+        if response is None:
+            raise RuntimeError("Nebius vision analysis did not return a response")
         content = response.choices[0].message.content
         if not content:
             raise RuntimeError("Nebius returned no wardrobe image analysis")
@@ -248,3 +264,27 @@ def _strict_json_schema(schema: dict[str, Any]) -> dict[str, Any]:
                 if isinstance(item, dict):
                     _strict_json_schema(item)
     return schema
+
+
+def _normalize_image(image_bytes: bytes) -> bytes:
+    """Apply orientation and bound image dimensions before remote inference."""
+    try:
+        with Image.open(BytesIO(image_bytes)) as uploaded:
+            uploaded.seek(0)
+            image = ImageOps.exif_transpose(uploaded)
+            image.thumbnail(
+                (MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION),
+                Image.Resampling.LANCZOS,
+            )
+            if image.mode != "RGB":
+                if "A" in image.getbands():
+                    background = Image.new("RGBA", image.size, "white")
+                    background.alpha_composite(image.convert("RGBA"))
+                    image = background.convert("RGB")
+                else:
+                    image = image.convert("RGB")
+            output = BytesIO()
+            image.save(output, format="JPEG", quality=88, optimize=True)
+            return output.getvalue()
+    except (UnidentifiedImageError, OSError) as error:
+        raise ValueError("The uploaded file is not a readable image.") from error
