@@ -9,4 +9,5 @@ __pycache__/
 .ruff_cache/
 .streamlit/secrets.toml
 data/*.db
+data/*.db-*
 *.sqlite3

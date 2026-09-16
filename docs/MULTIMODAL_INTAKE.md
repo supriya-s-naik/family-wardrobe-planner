@@ -7,7 +7,7 @@
 3. Choose **Analyze photo with AI**.
 4. Review the suggested name, category, color, formality, seasons, warmth, and occasion tags.
 5. Correct any field and choose **Add to wardrobe**.
-6. The item and photo become available to planning for the rest of the app session.
+6. The item and photo are saved to SQLite and remain available after an app restart.
 7. Choose **Style this item** on its wardrobe card to open event planning around it.
 8. Select **Use if suitable** for a soft preference or **Must use** for a validated requirement.
 
@@ -31,7 +31,7 @@ Uploaded image
     → WardrobeImageAnalysis schema
     → editable Streamlit form
     → validated WardrobeItem
-    → session inventory
+    → SQLite inventory
     → LangGraph planning context
 ```
 

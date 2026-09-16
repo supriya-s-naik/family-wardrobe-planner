@@ -10,34 +10,49 @@ import streamlit as st
 
 from wardrobe_planner.adapters.mem0_memory import Mem0PreferenceMemory
 from wardrobe_planner.adapters.nebius import NebiusModel
+from wardrobe_planner.adapters.sqlite_store import SQLiteApplicationStore
 from wardrobe_planner.data.seed_loader import load_seed_dataset
 from wardrobe_planner.domain.models import Event, WardrobeItem, WeatherSnapshot
 from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workflow
 
 ROOT = Path(__file__).resolve().parent
-APP_STATE_VERSION = "mem0-preferences-v10"
+APP_STATE_VERSION = "sqlite-persistence-v11"
 st.set_page_config(
     page_title="Everyday / together · Wardrobe Planner", page_icon="🌿", layout="wide"
 )
 st.html(f"<style>{(ROOT / 'assets' / 'app.css').read_text(encoding='utf-8')}</style>")
-dataset = load_seed_dataset(ROOT / "data" / "seed")
+seed_dataset = load_seed_dataset(ROOT / "data" / "seed")
+application_store = SQLiteApplicationStore.from_env(ROOT / "data" / "wardrobe_planner.db")
+application_store.initialize(seed_dataset)
+
+# Carry prototype-session additions into SQLite once when upgrading an active browser session.
+legacy_items = st.session_state.pop("session_wardrobe_items", [])
+legacy_images = st.session_state.pop("session_wardrobe_images", {})
+for legacy_item in legacy_items:
+    item = WardrobeItem.model_validate(legacy_item)
+    application_store.save_wardrobe_item(
+        item,
+        image_bytes=legacy_images.get(item.id),
+    )
+legacy_weather = {
+    snapshot.key: snapshot
+    for snapshot in (
+        WeatherSnapshot.model_validate(row)
+        for row in st.session_state.pop("session_weather", [])
+    )
+}
+for legacy_event_data in st.session_state.pop("session_events", []):
+    legacy_event = Event.model_validate(legacy_event_data)
+    if weather := legacy_weather.get(legacy_event.weather_key):
+        application_store.save_event(legacy_event, weather)
+
+dataset = application_store.load_dataset(seed_dataset)
 if st.session_state.get("app_state_version") != APP_STATE_VERSION:
     st.session_state.pop("planning_state", None)
     st.session_state.pop("planning_job", None)
     st.session_state.pop("planning_error", None)
     st.session_state["app_state_version"] = APP_STATE_VERSION
-st.session_state.setdefault("session_wardrobe_items", [])
-st.session_state.setdefault("session_wardrobe_images", {})
-st.session_state.setdefault("session_events", [])
-st.session_state.setdefault("session_weather", [])
 st.session_state.setdefault("wardrobe_image_analysis_cache", {})
-dataset.wardrobe_items.extend(
-    WardrobeItem.model_validate(item) for item in st.session_state["session_wardrobe_items"]
-)
-dataset.events.extend(Event.model_validate(event) for event in st.session_state["session_events"])
-dataset.weather.extend(
-    WeatherSnapshot.model_validate(weather) for weather in st.session_state["session_weather"]
-)
 member_by_id = {m.id: m for m in dataset.family_members}
 event_by_id = {e.id: e for e in dataset.events}
 item_by_id = {i.id: i for i in dataset.wardrobe_items}
@@ -251,12 +266,14 @@ def add_wardrobe_item_dialog():
             seasons=seasons,
             warmth=item_warmth,
             occasion_tags=[tag.strip() for tag in occasion_tags.split(",") if tag.strip()],
-            image_path="session_upload" if photo else None,
-            notes="Added during this prototype session.",
+            image_path="sqlite_upload" if photo else None,
+            notes="Added through wardrobe intake.",
         )
-        st.session_state["session_wardrobe_items"].append(item.model_dump(mode="json"))
-        if photo:
-            st.session_state["session_wardrobe_images"][item_id] = photo.getvalue()
+        application_store.save_wardrobe_item(
+            item,
+            image_bytes=photo.getvalue() if photo else None,
+            image_media_type=photo.type if photo else None,
+        )
         st.session_state["wardrobe_notice"] = f"{item.name} was added for {member_by_id[member_id].name}."
         st.rerun()
 
@@ -330,8 +347,7 @@ def add_event_dialog():
             precipitation_probability=rain,
             wind_mph=wind,
         )
-        st.session_state["session_events"].append(event.model_dump(mode="json"))
-        st.session_state["session_weather"].append(weather.model_dump(mode="json"))
+        application_store.save_event(event, weather)
         st.session_state["events_notice"] = f"{event.name} was added and is ready to plan."
         st.rerun()
 
@@ -679,14 +695,14 @@ elif page == "Wardrobe":
         and (selected_category == "All" or i.category == selected_category)
     ]
     st.caption(
-        f"{len(items)} pieces · Illustrations show category and color; item photos aren’t available yet."
+        f"{len(items)} pieces · Uploaded photos appear when available; seeded items use illustrations."
     )
     if not items:
         st.info("No pieces in this category yet. Try another category.")
     for start in range(0, len(items), 3):
         for column, item in zip(st.columns(3), items[start : start + 3]):
             with column, st.container(border=True):
-                uploaded_image = st.session_state["session_wardrobe_images"].get(item.id)
+                uploaded_image = application_store.get_wardrobe_image(item.id)
                 if uploaded_image:
                     st.image(uploaded_image, caption=item.name, use_container_width=True)
                 else:
@@ -699,12 +715,37 @@ elif page == "Wardrobe":
                     st.write("**Occasions:** " + ", ".join(item.occasion_tags))
                     if item.notes:
                         st.write(item.notes)
-                st.button(
-                    "Style this item →",
-                    key=f"style_{item.id}",
-                    on_click=style_item,
-                    args=(item.id,),
-                )
+                style_action, availability_action = st.columns(2)
+                with style_action:
+                    st.button(
+                        "Style this item →",
+                        key=f"style_{item.id}",
+                        on_click=style_item,
+                        args=(item.id,),
+                        disabled=not item.available,
+                    )
+                with availability_action:
+                    planning_job = st.session_state.get("planning_job")
+                    planning_is_running = planning_job is not None and not planning_job.done()
+                    if st.button(
+                        "Mark unavailable" if item.available else "Mark available",
+                        key=f"availability_{item.id}",
+                        disabled=planning_is_running,
+                    ):
+                        updated_item = application_store.set_wardrobe_item_availability(
+                            item.id, not item.available
+                        )
+                        if not updated_item.available and st.session_state.get(
+                            "style_item_id"
+                        ) == item.id:
+                            clear_style_item()
+                        st.session_state.pop("planning_state", None)
+                        status = "available" if updated_item.available else "unavailable"
+                        st.session_state["wardrobe_notice"] = (
+                            f"{updated_item.name} is now {status}. Generate a new plan to use "
+                            "the updated wardrobe."
+                        )
+                        st.rerun()
 elif page == "Events":
     st.title("A little planning. A lighter morning.")
     st.write("Bring the whole family’s outfits together, occasion by occasion.")

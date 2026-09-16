@@ -13,6 +13,7 @@ The repository currently contains the product requirements, architecture, a runn
 - [Architecture infographic](docs/assets/wardrobe-planner-architecture-user-flow-v2.png)
 - [Nebius model spike](docs/MODEL_SPIKE.md)
 - [Multimodal wardrobe intake](docs/MULTIMODAL_INTAKE.md)
+- [Local SQLite persistence](docs/PERSISTENCE.md)
 - [Durable preference memory](docs/MEMORY.md)
 - [Evaluation approach](docs/EVALUATION.md)
 - [Latest evaluation results](evals/results/latest.md)
@@ -50,7 +51,9 @@ it. In **Plan outfits**, select events and a purchase budget, then generate the 
 Choose **Demo-safe local** under **Planning options** for an offline run. Seeded clothing
 uses category/color illustrations. In **Wardrobe**, an uploaded item photo can be analyzed
 by the Nebius Gemma vision model; the resulting metadata remains editable before saving,
-and the uploaded photo appears on the new item card. Each wardrobe card also offers
+and the uploaded photo appears on the new item card after an application restart. Wardrobe
+items, uploaded photos, events, availability changes, and event weather are stored in a local
+SQLite database. Each wardrobe card also offers
 **Style this item**: **Use if suitable** treats the garment as a preference, while
 **Must use** makes its inclusion a validator-enforced requirement for the selected events.
 Theme settings live in
@@ -60,7 +63,7 @@ In **Family**, users can explicitly save, inspect, and delete durable member pre
 Mem0. Planning retrieves them with a visible, member-scoped `search_memories` tool call. Retrieved
 memories guide personalization but do not override current instructions or validated constraints.
 
-The Nebius smoke test makes two small live calls: one tool-selection check and one strict structured-output check. It never prints the API key. The evaluation command runs 12 deterministic regression cases and writes machine-readable and Markdown reports under `evals/results/`.
+The Nebius smoke test makes two small live calls: one tool-selection check and one strict structured-output check. It never prints the API key. The evaluation command runs 13 deterministic regression cases and writes machine-readable and Markdown reports under `evals/results/`.
 
 ## Project structure
 
@@ -75,6 +78,7 @@ scripts/smoke_test_mem0.py     Reversible live memory round-trip check
 evals/                         Versioned cases, human rubric, and results
 src/wardrobe_planner/
   adapters/mem0_memory.py      Member-scoped durable preference adapter
+  adapters/sqlite_store.py     Local wardrobe, event, weather, and photo persistence
   adapters/local.py            Credential-free local adapters
   data/seed_loader.py          Seed loading and reference validation
   domain/models.py             Pydantic domain contracts

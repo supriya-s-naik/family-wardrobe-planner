@@ -41,7 +41,7 @@ flowchart LR
     end
 
     subgraph DATA[Authoritative and contextual data]
-        SQLITE[(SQLite<br/>family, wardrobe, events, plans)]
+        SQLITE[(SQLite<br/>wardrobe, events, photos)]
         WEATHER[Weather adapter<br/>live or seeded]
         CATALOG[Curated sample catalog]
         DOCS[Reviewed guidance documents]
@@ -76,7 +76,11 @@ flowchart LR
 
 The application uses a hybrid workflow. LangGraph controls the required sequence, gathers authoritative context through the typed `prepare_planning_context` tool, validates the result, and enforces termination conditions. The Nebius model has bounded autonomy inside the planning stage: it chooses the outfit combinations, explains them, decides whether catalog purchases add value, and submits the complete result through the typed `submit_outfit_plan` tool. A live run therefore needs one provider request for each planning or repair attempt instead of one request per data lookup.
 
-The model never becomes the source of truth for inventory, availability, events, or budget. Those facts come from SQLite through typed tools. This lets deterministic code reject hallucinated item IDs and other hard-constraint violations before a plan reaches the user.
+The model never becomes the source of truth for inventory, availability, events, or budget.
+Inventory, availability, and events come from SQLite-backed application state; household profiles,
+the catalog, and default budgets are bootstrapped from versioned seed data. Typed tools expose the
+combined authoritative dataset to the graph. This lets deterministic code reject hallucinated item
+IDs and other hard-constraint violations before a plan reaches the user.
 
 Wardrobe intake uses a separate Nebius Gemma vision model. It proposes structured metadata
 from an uploaded photo, but the user reviews and edits every field before the application
@@ -91,7 +95,7 @@ creates an authoritative wardrobe item.
 | Nebius model | Contextual reasoning, outfit generation, purchase decisions, explanations, typed plan submission | Deciding whether hard constraints passed |
 | Nebius vision model | Suggesting editable wardrobe metadata from one uploaded item photo | Saving inventory without user review |
 | Typed tool layer | Stable boundary between the agent and application services | Free-form database access by the model |
-| SQLite | Source of truth for household members, wardrobe, events, budgets, plans | Semantic style guidance |
+| SQLite | Persistent wardrobe, uploaded photos, availability, events, and event weather | Semantic style guidance |
 | Pinecone | Semantic retrieval of reviewed styling and dress-code guidance | Inventory, prices, or member ownership |
 | Mem0 | Member-scoped preferences learned across conversations | Events, wardrobe availability, or current hard constraints |
 | Validator | Schema, ownership, availability, coverage, explicit preference, and budget checks | Subjective style judgments |

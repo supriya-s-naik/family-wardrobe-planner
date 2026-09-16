@@ -116,6 +116,35 @@ def test_style_this_item_can_be_required_in_a_plan():
     assert "maya_top_03" in maya_outfit["item_ids"]
 
 
+def test_wardrobe_availability_change_survives_app_restart_and_affects_planning():
+    app = start()
+    app.radio(key="page").set_value("Wardrobe").run()
+    app.selectbox(key="owner").select("member_maya").run()
+    app.selectbox[1].select("footwear").run()
+    app.button(key="availability_maya_shoe_02").click().run()
+
+    assert not app.exception
+    assert "is now unavailable" in app.success[0].value
+    assert app.button(key="availability_maya_shoe_02").label == "Mark available"
+    assert app.button(key="style_maya_shoe_02").disabled
+
+    restarted_app = start()
+    restarted_app.radio(key="page").set_value("Plan outfits").run()
+    restarted_app.multiselect(key="selected_events").set_value(
+        ["event_coastal_outing"]
+    ).run()
+    restarted_app.radio[1].set_value("Demo-safe local").run()
+    restarted_app.button(key="generate_plan").click().run(timeout=15)
+    restarted_app = await_plan(restarted_app)
+
+    result = restarted_app.session_state["planning_state"]["final_result"]
+    selected_item_ids = {
+        item_id for outfit in result["outfits"] for item_id in outfit["item_ids"]
+    }
+    assert result["status"] == "valid"
+    assert "maya_shoe_02" not in selected_item_ids
+
+
 def test_family_page_can_save_and_display_member_scoped_memory():
     class FakePreferenceStore:
         def __init__(self):
