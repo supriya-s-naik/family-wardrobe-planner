@@ -26,6 +26,12 @@ Publish the full local suite as a named LangSmith dataset and experiment:
 uv run --offline python scripts/run_langsmith_evals.py
 ```
 
+Publish one live case as a separate, low-cost LangSmith experiment:
+
+```powershell
+uv run python scripts/run_langsmith_evals.py --backend nebius --case coastal_standard --dataset wardrobe-planner-live-coastal-v1
+```
+
 The 13 cases in `evals/cases.json` cover single and multi-event planning, zero-budget requests,
 unavailable wardrobe items, retrieval relevance, grounded citations, required tool use, hard
 constraints, repeatability, member-scoped memory retrieval, and observable memory application.
@@ -61,8 +67,9 @@ LangSmith tracing is enabled through `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `
 ## Recorded evidence
 
 - Local regression report: 13/13 cases passed, including the member-isolation memory case.
-- Live Nebius/Pinecone/Mem0 report: `coastal_standard` is recorded separately in
-  `evals/results/nebius-coastal.*`.
+- Live Nebius/Pinecone/Mem0 report: `coastal_standard` passed 1/1 with two tool calls,
+  two grounded guidance IDs, member-isolated memories, and zero validation errors. It is recorded
+  separately in `evals/results/nebius-coastal.*`.
 - LangSmith dataset: `wardrobe-planner-evals-v1`.
 - LangSmith experiment: `wardrobe-planner-local-087409b9`.
 - Advisory model judge: `coastal_standard` received 4.8/5 with evidence for every rubric category.

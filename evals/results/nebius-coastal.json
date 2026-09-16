@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T01:34:02.267853+00:00",
+  "generated_at": "2026-09-16T00:46:04.205887+00:00",
   "backend": "nebius",
   "passed_cases": 1,
   "total_cases": 1,
@@ -25,14 +25,16 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 3,
-        "purchase_cost": 38.0,
-        "owned_items_used": 11,
-        "tool_calls": 1,
-        "latency_ms": 17841,
+        "purchase_cost": 0.0,
+        "owned_items_used": 12,
+        "tool_calls": 2,
+        "latency_ms": 24043,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_coastal_layers"
@@ -41,7 +43,8 @@
           "guide_child_comfort",
           "guide_coastal_layers"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 2
       },
       "failures": []
     }

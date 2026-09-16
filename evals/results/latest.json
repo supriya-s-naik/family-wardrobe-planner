@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-16T00:08:43.931697+00:00",
+  "generated_at": "2026-09-16T00:48:14.104549+00:00",
   "backend": "local",
   "passed_cases": 13,
   "total_cases": 13,
@@ -34,7 +34,7 @@
         "purchase_cost": 0.0,
         "owned_items_used": 12,
         "tool_calls": 6,
-        "latency_ms": 18,
+        "latency_ms": 19,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_purchase_reuse",
@@ -79,7 +79,7 @@
         "purchase_cost": 0.0,
         "owned_items_used": 11,
         "tool_calls": 6,
-        "latency_ms": 14,
+        "latency_ms": 15,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_festive_family",
@@ -218,7 +218,7 @@
         "purchase_cost": 0.0,
         "owned_items_used": 12,
         "tool_calls": 6,
-        "latency_ms": 14,
+        "latency_ms": 13,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_purchase_reuse",
@@ -263,7 +263,7 @@
         "purchase_cost": 0.0,
         "owned_items_used": 11,
         "tool_calls": 6,
-        "latency_ms": 14,
+        "latency_ms": 13,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_festive_family",
@@ -354,7 +354,7 @@
         "purchase_cost": 0.0,
         "owned_items_used": 30,
         "tool_calls": 9,
-        "latency_ms": 16,
+        "latency_ms": 15,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_coastal_layers",
@@ -402,7 +402,7 @@
         "purchase_cost": 96.0,
         "owned_items_used": 10,
         "tool_calls": 7,
-        "latency_ms": 83,
+        "latency_ms": 84,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_coastal_layers",
@@ -448,7 +448,7 @@
         "purchase_cost": 96.0,
         "owned_items_used": 10,
         "tool_calls": 7,
-        "latency_ms": 15,
+        "latency_ms": 16,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_coastal_layers",
@@ -494,7 +494,7 @@
         "purchase_cost": 0.0,
         "owned_items_used": 12,
         "tool_calls": 6,
-        "latency_ms": 14,
+        "latency_ms": 15,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_purchase_reuse",
@@ -539,7 +539,7 @@
         "purchase_cost": 0.0,
         "owned_items_used": 11,
         "tool_calls": 6,
-        "latency_ms": 14,
+        "latency_ms": 15,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_festive_family",
@@ -584,7 +584,7 @@
         "purchase_cost": 96.0,
         "owned_items_used": 10,
         "tool_calls": 7,
-        "latency_ms": 15,
+        "latency_ms": 17,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_coastal_layers",

@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 from pathlib import Path
 
@@ -173,8 +174,11 @@ def test_nebius_agent_backend_drives_the_same_graph_contract() -> None:
     expected_plan.pop("workflow_metrics")
     expected_plan["status"] = "needs_review"
 
+    captured = {}
+
     class FakeNebiusModel:
-        def generate_via_tool(self, **_: object):
+        def generate_via_tool(self, **kwargs: object):
+            captured.update(kwargs)
             return OutfitPlan.model_validate(expected_plan)
 
     graph = build_planning_graph(dataset, NebiusPlanningAgent(FakeNebiusModel()))
@@ -187,3 +191,7 @@ def test_nebius_agent_backend_drives_the_same_graph_contract() -> None:
     assert state["tool_trace"][0]["tool"] == "prepare_planning_context"
     assert state["tool_trace"][0]["actor"] == "workflow"
     assert state["tool_trace"][1]["tool"] == "search_memories"
+    prompt_payload = json.loads(captured["user_message"])
+    assert "maya_outer_02" not in prompt_payload["allowed_wardrobe_ids_by_member"]["member_maya"]
+    assert "maya_outer_01" in prompt_payload["allowed_wardrobe_ids_by_member"]["member_maya"]
+    assert "opaque identifiers" in captured["system_prompt"]

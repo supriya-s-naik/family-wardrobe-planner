@@ -20,6 +20,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run a hosted LangSmith evaluation experiment.")
     parser.add_argument("--backend", choices=["local", "nebius"], default="local")
     parser.add_argument("--dataset", default=DEFAULT_DATASET_NAME)
+    parser.add_argument("--case", action="append", dest="case_ids")
     args = parser.parse_args()
 
     load_dotenv(ROOT / ".env")
@@ -28,12 +29,18 @@ def main() -> None:
 
     client = Client()
     cases = load_eval_cases(ROOT / "evals" / "cases.json")
+    if args.case_ids:
+        requested = set(args.case_ids)
+        cases = [case for case in cases if case.id in requested]
+        missing = requested - {case.id for case in cases}
+        if missing:
+            raise SystemExit(f"Unknown evaluation case(s): {', '.join(sorted(missing))}")
     if not client.has_dataset(dataset_name=args.dataset):
         dataset = client.create_dataset(
             args.dataset,
             description=(
-                "Twelve versioned family wardrobe planning cases for constraints, tool use, "
-                "retrieval grounding, and repeatability."
+                f"{len(cases)} versioned family wardrobe planning case(s) for constraints, "
+                "tool use, retrieval grounding, memory, and repeatability."
             ),
         )
     else:
@@ -74,6 +81,8 @@ def main() -> None:
             "event_formality",
             "participant_coverage",
             "budget_compliance",
+            "memory_isolation",
+            "memory_application",
         ]
         return {"key": "hard_constraints", "score": all(checks.get(name) for name in names)}
 

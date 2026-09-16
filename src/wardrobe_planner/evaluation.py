@@ -294,7 +294,8 @@ def write_report(report: EvalReport, output_dir: Path, stem: str = "latest") -> 
             (
                 "Each case checks schema validity, workflow validity, participant coverage, hard "
                 "constraints, budget, required tool calls, retrieval relevance, citation "
-                "grounding, unavailable-item exclusion, and repeatability."
+                "grounding, unavailable-item exclusion, member-scoped memory, memory "
+                "application, and repeatability."
             ),
         ]
     )
