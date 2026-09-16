@@ -5,6 +5,7 @@
   {"id":"maya_bottom_01","member_id":"member_maya","name":"Navy tailored trousers","category":"bottom","color":"navy","formality":"smart_casual","seasons":["spring","fall","winter"],"warmth":"medium","occasion_tags":["school","dinner","work"],"available":true},
   {"id":"maya_bottom_02","member_id":"member_maya","name":"Cream palazzo pants","category":"bottom","color":"cream","formality":"festive","seasons":["spring","summer","fall"],"warmth":"light","occasion_tags":["festival","family_dinner"],"available":true},
   {"id":"maya_bottom_03","member_id":"member_maya","name":"Dark straight-leg jeans","category":"bottom","color":"dark blue","formality":"casual","seasons":["spring","fall","winter"],"warmth":"medium","occasion_tags":["outing","travel"],"available":true},
+  {"id":"maya_bottom_04","member_id":"member_maya","name":"Navy cotton walking shorts","category":"bottom","garment_type":"shorts","color":"navy","formality":"casual","seasons":["spring","summer","fall"],"warmth":"light","occasion_tags":["beach","outing","travel","walking"],"available":true},
   {"id":"maya_outer_01","member_id":"member_maya","name":"Camel knit cardigan","category":"outerwear","color":"camel","formality":"smart_casual","seasons":["spring","fall","winter"],"warmth":"warm","occasion_tags":["school","dinner","travel"],"available":true},
   {"id":"maya_acc_01","member_id":"member_maya","name":"Burgundy printed dupatta","category":"accessory","color":"burgundy","formality":"festive","seasons":["spring","summer","fall","winter"],"warmth":"light","occasion_tags":["festival","family_dinner"],"available":true},
   {"id":"maya_shoe_01","member_id":"member_maya","name":"Tan leather flats","category":"footwear","color":"tan","formality":"smart_casual","seasons":["spring","summer","fall"],"warmth":"light","occasion_tags":["school","dinner","walking"],"available":true},
@@ -32,4 +33,3 @@
   {"id":"anaya_shoe_01","member_id":"member_anaya","name":"Navy cushioned flats","category":"footwear","color":"navy","formality":"smart_casual","seasons":["spring","summer","fall"],"warmth":"light","occasion_tags":["school","dinner","walking"],"available":true},
   {"id":"anaya_shoe_02","member_id":"member_anaya","name":"Purple play sneakers","category":"footwear","color":"purple","formality":"casual","seasons":["spring","summer","fall"],"warmth":"light","occasion_tags":["outing","play","walking"],"available":true}
 ]
-

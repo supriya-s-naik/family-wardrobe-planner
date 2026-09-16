@@ -1,0 +1,58 @@
+{
+  "generated_at": "2026-09-16T22:50:27.834068+00:00",
+  "backend": "local",
+  "passed_cases": 4,
+  "total_cases": 4,
+  "results": [
+    {
+      "case_id": "maya_beach_shorts_natural",
+      "feedback": "I would rather wear shorts at the beach than denim jeans.",
+      "passed": true,
+      "checks": {
+        "expected_status": true,
+        "plan_valid": true,
+        "expected_item_used": true,
+        "forbidden_item_removed": true,
+        "other_outfits_preserved": true
+      },
+      "message": "Updated Maya's Santa Cruz Coastal Outing outfit: replaced Dark straight-leg jeans with Navy cotton walking shorts. The forecast high is 64\u00b0F, so the existing warm and rain layers remain in the plan."
+    },
+    {
+      "case_id": "maya_beach_shorts_direct",
+      "feedback": "Replace the jeans with shorts.",
+      "passed": true,
+      "checks": {
+        "expected_status": true,
+        "plan_valid": true,
+        "expected_item_used": true,
+        "forbidden_item_removed": true,
+        "other_outfits_preserved": true
+      },
+      "message": "Updated Maya's Santa Cruz Coastal Outing outfit: replaced Dark straight-leg jeans with Navy cotton walking shorts. The forecast high is 64\u00b0F, so the existing warm and rain layers remain in the plan."
+    },
+    {
+      "case_id": "maya_beach_shorts_preference",
+      "feedback": "I prefer navy cotton shorts rather than jeans.",
+      "passed": true,
+      "checks": {
+        "expected_status": true,
+        "plan_valid": true,
+        "expected_item_used": true,
+        "forbidden_item_removed": true,
+        "other_outfits_preserved": true
+      },
+      "message": "Updated Maya's Santa Cruz Coastal Outing outfit: replaced Dark straight-leg jeans with Navy cotton walking shorts. The forecast high is 64\u00b0F, so the existing warm and rain layers remain in the plan."
+    },
+    {
+      "case_id": "arjun_missing_skirt",
+      "feedback": "Replace the jeans with a skirt.",
+      "passed": true,
+      "checks": {
+        "expected_status": true,
+        "original_plan_preserved": true
+      },
+      "message": "Arjun has no available wardrobe or affordable catalog match for jeans, skirt. Add one to the wardrobe or revise the request."
+    }
+  ],
+  "pass_rate": 1.0
+}

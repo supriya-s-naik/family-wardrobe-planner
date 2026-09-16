@@ -36,6 +36,7 @@ def test_analyze_wardrobe_image_sends_image_and_validates_schema():
         {
             "name": "Blue denim jacket",
             "category": "outerwear",
+            "garment_type": "jacket",
             "color": "blue",
             "formality": "casual",
             "seasons": ["spring", "fall"],
@@ -57,6 +58,7 @@ def test_analyze_wardrobe_image_sends_image_and_validates_schema():
     )
 
     assert result.category == "outerwear"
+    assert result.garment_type == "jacket"
     assert result.confidence == 0.94
     request = create.call_args.kwargs
     assert request["model"] == "vision-model"
@@ -93,6 +95,7 @@ def test_analyze_wardrobe_image_resizes_large_upload_before_sending():
                             {
                                 "name": "Blue top",
                                 "category": "top",
+                                "garment_type": "shirt",
                                 "color": "blue",
                                 "formality": "casual",
                                 "seasons": ["spring"],
@@ -129,6 +132,7 @@ def test_analyze_wardrobe_image_retries_one_transient_timeout():
                         {
                             "name": "Floral dress",
                             "category": "one_piece",
+                            "garment_type": "dress",
                             "color": "coral",
                             "formality": "smart_casual",
                             "seasons": ["spring", "summer"],

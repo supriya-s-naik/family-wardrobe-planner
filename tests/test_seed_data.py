@@ -10,7 +10,7 @@ def test_seed_dataset_has_demo_scope() -> None:
     dataset = load_seed_dataset(SEED_DIR)
 
     assert len(dataset.family_members) == 3
-    assert len(dataset.wardrobe_items) == 30
+    assert len(dataset.wardrobe_items) == 31
     assert len(dataset.events) == 3
     assert set(dataset.demo_request.event_ids) == {event.id for event in dataset.events}
 
@@ -34,4 +34,3 @@ def test_every_event_has_seeded_weather() -> None:
 
     assert len(snapshots) == len(dataset.events)
     assert all(snapshot.source == "seeded" for snapshot in snapshots)
-

@@ -14,6 +14,8 @@ The database currently persists:
 - Validated family plans, including their request, result, evidence, and workflow metrics.
 - Saved plans can be deleted from Events after confirmation; replans remain available and are
   detached from a deleted comparison baseline.
+- Accepted conversational refinements are stored inside the saved planning state and retain the
+  original saved plan as their comparison source when one exists.
 
 Version-controlled JSON remains the bootstrap source for the fictional household, member
 profiles, sample catalog, guidance, and initial demo request. Database initialization inserts

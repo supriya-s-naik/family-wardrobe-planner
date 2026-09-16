@@ -12,6 +12,7 @@ flowchart LR
             REPAIR[5. Agent repairs invalid plan]
             POLICY[6. Bounded weather policy repair]
             PRESENT[7. Rank and present plan]
+            REFINE[8. Interpret feedback and apply minimal diff]
 
             INTAKE --> CONTEXT --> PLAN --> VALIDATE
             VALIDATE -->|Valid| PRESENT
@@ -19,6 +20,7 @@ flowchart LR
             VALIDATE -->|Errors and retries remain| REPAIR --> PLAN
             VALIDATE -->|Rain gap remains after retries| POLICY
             VALIDATE -->|Other errors at retry limit| PRESENT
+            PRESENT -->|Scoped user feedback| REFINE --> VALIDATE
         end
 
         TOOLS[Typed tool layer]
@@ -49,6 +51,8 @@ flowchart LR
     CONTEXT <--> TOOLS
     PLAN <--> TOOLS
     PLAN <--> NEBIUS
+    REFINE <--> NEBIUS
+    REFINE <--> TOOLS
     VALIDATE <--> SCHEMAS
 
     TOOLS <--> SQLITE

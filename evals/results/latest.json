@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-16T21:36:52.811006+00:00",
+  "generated_at": "2026-09-16T22:47:32.759477+00:00",
   "backend": "local",
   "passed_cases": 13,
   "total_cases": 13,
@@ -34,7 +34,7 @@
         "purchase_cost": 0.0,
         "owned_items_used": 12,
         "tool_calls": 6,
-        "latency_ms": 19,
+        "latency_ms": 20,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_purchase_reuse",
@@ -124,7 +124,7 @@
         "purchase_cost": 96.0,
         "owned_items_used": 10,
         "tool_calls": 7,
-        "latency_ms": 21,
+        "latency_ms": 16,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_coastal_layers",
@@ -170,7 +170,7 @@
         "purchase_cost": 96.0,
         "owned_items_used": 30,
         "tool_calls": 9,
-        "latency_ms": 35,
+        "latency_ms": 34,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_coastal_layers",
@@ -402,7 +402,7 @@
         "purchase_cost": 96.0,
         "owned_items_used": 10,
         "tool_calls": 7,
-        "latency_ms": 87,
+        "latency_ms": 86,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_coastal_layers",

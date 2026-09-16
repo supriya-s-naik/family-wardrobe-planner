@@ -15,6 +15,7 @@ The repository currently contains the product requirements, architecture, a runn
 - [Multimodal wardrobe intake](docs/MULTIMODAL_INTAKE.md)
 - [Local SQLite persistence](docs/PERSISTENCE.md)
 - [Durable preference memory](docs/MEMORY.md)
+- [Conversational plan refinement](docs/PLAN_REFINEMENT.md)
 - [Evaluation approach](docs/EVALUATION.md)
 - [Latest evaluation results](evals/results/latest.md)
 - [LangSmith evaluation evidence](evals/results/langsmith.md)
@@ -22,7 +23,7 @@ The repository currently contains the product requirements, architecture, a runn
 
 ## Demo household
 
-The Rivera household contains two adults and one child, 30 wardrobe items, three events, explicit preferences, seeded weather, a small product catalog, and reviewed guidance records for later RAG ingestion.
+The Rivera household contains two adults and one child, 31 wardrobe items, three events, explicit preferences, seeded weather, a small product catalog, and reviewed guidance records for later RAG ingestion.
 
 All data is fictional.
 
@@ -38,6 +39,7 @@ uv run python scripts/smoke_test_nebius.py
 uv run python scripts/smoke_test_vision.py path\to\garment.jpg
 uv run python scripts/smoke_test_mem0.py
 uv run --offline python scripts/run_evals.py
+uv run --offline python scripts/run_refinement_evals.py
 uv run --offline python scripts/run_langsmith_evals.py
 uv run --offline python scripts/run_model_judge.py --case coastal_standard
 uv run streamlit run app.py
@@ -55,7 +57,10 @@ and the uploaded photo appears on the new item card after an application restart
 items, uploaded photos, events, availability changes, and event weather are stored in a local
 SQLite database. Valid plans can be saved, reopened, and used as a replanning baseline. When an
 item from a saved plan becomes unavailable, the app identifies the affected plan and shows what
-the new plan changed or preserved. Each wardrobe card also offers
+the new plan changed or preserved. A valid result also includes **Refine this plan**, where a user
+can request a scoped change such as replacing denim jeans with shorts. Nebius or the local fallback
+turns that message into a typed intent; deterministic code changes one outfit, preserves the rest,
+and validates the revision before the user accepts, saves, or remembers it. Each wardrobe card also offers
 **Style this item**: **Use if suitable** treats the garment as a preference, while
 **Must use** makes its inclusion a validator-enforced requirement for the selected events.
 Theme settings live in
@@ -75,6 +80,7 @@ data/seed/                     Fictional household and demo scenario
 docs/                          PRD, architecture, and presentation assets
 scripts/validate_seed.py       Fast deterministic seed check
 scripts/run_evals.py           Local and Nebius evaluation runner
+scripts/run_refinement_evals.py Feedback-loop regression evaluation
 scripts/run_langsmith_evals.py Hosted LangSmith dataset and experiment runner
 scripts/smoke_test_mem0.py     Reversible live memory round-trip check
 evals/                         Versioned cases, human rubric, and results
@@ -85,9 +91,11 @@ src/wardrobe_planner/
   data/seed_loader.py          Seed loading and reference validation
   domain/models.py             Pydantic domain contracts
   workflow/                    LangGraph, tools, planner, and validator
+  workflow/refinement.py       Typed feedback interpretation and minimal-diff plan revisions
 tests/test_seed_data.py        Seed and adapter regression checks
 tests/test_evaluation.py       Evaluation-suite regression check
 tests/test_memory.py           Mem0 scoping and normalization checks
+tests/test_refinement.py       Feedback interpretation and minimal-change regression checks
 ```
 
 ## Planned integrations
@@ -103,3 +111,8 @@ Exact inventory, ownership, availability, events, budget, and saved plans remain
 ## Workflow implemented
 
 The interface offers two backends. **Nebius live** is the primary path: LangGraph gathers the authoritative planning context through one aggregate typed tool, retrieves semantically relevant reviewed guidance from Pinecone, then makes one Nebius request in which the model builds and submits the complete plan through the typed `submit_outfit_plan` tool. Planning details display the retrieval query, provider, relevance scores, sources, and passages. If Pinecone is unavailable, the run is visibly labeled as a local-keyword fallback. **Demo-safe local** follows the same graph and validation rules without network access and retains the granular tool trace for demonstration. Both paths validate ownership, availability, coverage, preferences, purchase references, weather readiness, and budget. The workflow can immediately fix a plan whose only failures are affordable catalog-backed rain-protection gaps, recording each action before validating again. Other model errors get at most two repair attempts.
+
+Plan refinement is a bounded follow-up path. The selected person and occasion establish scope,
+Nebius interprets the natural-language request into a typed intent, and deterministic selection
+changes only the matching outfit. The full validator runs before the revision can be accepted.
+The user explicitly chooses whether an accepted preference remains plan-specific or is saved to Mem0.

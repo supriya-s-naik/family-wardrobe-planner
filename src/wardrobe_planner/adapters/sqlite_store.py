@@ -256,12 +256,28 @@ class SQLiteApplicationStore:
         if not event_ids:
             raise ValueError("A saved plan must contain at least one event")
 
+        persisted_state = json.loads(json.dumps(planning_state, default=str))
+        refinement = persisted_state.pop("refinement", None)
+        persisted_state.pop("refinement_history", None)
+        if refinement:
+            persisted_state["refinement_summary"] = {
+                key: refinement.get(key)
+                for key in (
+                    "event_id",
+                    "member_id",
+                    "removed_item_ids",
+                    "replacement_item_id",
+                    "interpreter",
+                    "memory_scope",
+                )
+                if refinement.get(key) is not None
+            }
         saved_plan = SavedPlan(
             id=f"plan_{uuid4().hex[:12]}",
             household_id=household_id,
             event_ids=event_ids,
             purchase_budget=float(request.get("purchase_budget", 0)),
-            planning_state=json.loads(json.dumps(planning_state, default=str)),
+            planning_state=persisted_state,
             created_at=datetime.now(UTC),
             source_plan_id=source_plan_id,
         )

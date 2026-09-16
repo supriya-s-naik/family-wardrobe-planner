@@ -6,15 +6,15 @@
 
 | Case | Result | Outfits | Cost | Tool calls | Latency |
 |---|---:|---:|---:|---:|---:|
-| `school_standard` | PASS | 3 | $0 | 6 | 19 ms |
+| `school_standard` | PASS | 3 | $0 | 6 | 20 ms |
 | `festive_standard` | PASS | 3 | $0 | 6 | 16 ms |
-| `coastal_standard` | PASS | 3 | $96 | 7 | 21 ms |
-| `multi_event_standard` | PASS | 9 | $96 | 9 | 35 ms |
+| `coastal_standard` | PASS | 3 | $96 | 7 | 16 ms |
+| `multi_event_standard` | PASS | 9 | $96 | 9 | 34 ms |
 | `school_zero_budget` | PASS | 3 | $0 | 6 | 15 ms |
 | `festive_zero_budget` | PASS | 3 | $0 | 6 | 15 ms |
 | `coastal_zero_budget` | PASS | 3 | $0 | 7 | 16 ms |
 | `multi_event_zero_budget` | PASS | 9 | $0 | 9 | 17 ms |
-| `coastal_maya_sneakers_unavailable` | PASS | 3 | $96 | 7 | 87 ms |
+| `coastal_maya_sneakers_unavailable` | PASS | 3 | $96 | 7 | 86 ms |
 | `coastal_anaya_sneakers_unavailable` | PASS | 3 | $96 | 7 | 16 ms |
 | `school_arjun_loafers_unavailable` | PASS | 3 | $0 | 6 | 16 ms |
 | `festive_anaya_kurta_unavailable` | PASS | 3 | $0 | 6 | 15 ms |

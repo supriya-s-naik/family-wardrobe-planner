@@ -22,6 +22,15 @@ def await_plan(app):
     return app.run(timeout=15)
 
 
+def await_refinement(app):
+    try:
+        job = app.session_state["refinement_job"]
+    except KeyError:
+        return app
+    job.result(timeout=15)
+    return app.run(timeout=15)
+
+
 def test_overview_and_wardrobe_navigation():
     app = start()
     assert not app.exception
@@ -218,6 +227,43 @@ def test_saved_plan_deletion_requires_confirmation():
     assert not app.exception
     assert "Saved plan deleted" in app.success[0].value
     assert all(button.key != f"open_saved_{saved_plan_id}" for button in app.button)
+
+
+def test_plan_feedback_can_replace_one_item_and_be_accepted():
+    app = start()
+    app.radio(key="page").set_value("Plan outfits").run()
+    app.multiselect(key="selected_events").set_value(["event_coastal_outing"]).run()
+    app.radio[1].set_value("Demo-safe local").run()
+    app.button(key="generate_plan").click().run(timeout=15)
+    app = await_plan(app)
+
+    app.text_area(key="refinement_feedback").set_value(
+        "I would rather wear shorts at the beach than denim jeans."
+    ).run()
+    app.button(key="FormSubmitter:refine_plan_form-Suggest changes").click().run()
+    app = await_refinement(app)
+
+    result = app.session_state["planning_state"]["final_result"]
+    maya_outfit = next(
+        outfit for outfit in result["outfits"] if outfit["member_id"] == "member_maya"
+    )
+    assert not app.exception
+    assert "maya_bottom_04" in maya_outfit["item_ids"]
+    assert "maya_bottom_03" not in maya_outfit["item_ids"]
+    assert app.button(key="save_current_plan").disabled
+
+    app.button(key="accept_refinement").click().run()
+
+    assert app.session_state["planning_state"]["refinement"]["accepted"] is True
+    assert not app.button(key="save_current_plan").disabled
+
+    app.button(key="save_current_plan").click().run()
+    saved_plan_id = app.session_state["planning_state"]["saved_plan_id"]
+    app.radio(key="page").set_value("Events").run()
+    app.button(key=f"open_saved_{saved_plan_id}").click().run()
+
+    assert "refinement_history" not in app.session_state["planning_state"]
+    assert "refinement" not in app.session_state["planning_state"]
 
 
 def test_family_page_can_save_and_display_member_scoped_memory():

@@ -32,6 +32,7 @@ class WardrobeItem(BaseModel):
     member_id: str
     name: str
     category: Literal["top", "bottom", "one_piece", "outerwear", "footwear", "accessory"]
+    garment_type: str | None = None
     color: str
     formality: Literal["casual", "smart_casual", "formal", "festive"]
     seasons: list[Literal["spring", "summer", "fall", "winter"]]
@@ -45,6 +46,7 @@ class WardrobeItem(BaseModel):
 class WardrobeImageAnalysis(BaseModel):
     name: str
     category: Literal["top", "bottom", "one_piece", "outerwear", "footwear", "accessory"]
+    garment_type: str | None = None
     color: str
     formality: Literal["casual", "smart_casual", "formal", "festive"]
     seasons: list[Literal["spring", "summer", "fall", "winter"]]

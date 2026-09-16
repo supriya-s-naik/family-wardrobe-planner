@@ -91,7 +91,8 @@ class NebiusModel:
                                 "dresses, jumpsuits, and other garments covering both torso and lower "
                                 "body; use top only for shirts, blouses, sweaters, and similar upper-body "
                                 "pieces. Choose the closest allowed formality, seasons, and warmth. Keep "
-                                "the name short and occasion tags practical. Confidence must reflect "
+                                "the name short, provide a specific garment_type such as shorts, jeans, "
+                                "cardigan, or dress, and keep occasion tags practical. Confidence must reflect "
                                 "image clarity and classification certainty."
                             ),
                         },

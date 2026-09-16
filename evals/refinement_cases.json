@@ -1,0 +1,36 @@
+[
+  {
+    "id": "maya_beach_shorts_natural",
+    "feedback": "I would rather wear shorts at the beach than denim jeans.",
+    "event_id": "event_coastal_outing",
+    "member_id": "member_maya",
+    "expected_status": "applied",
+    "expected_item_id": "maya_bottom_04",
+    "forbidden_item_id": "maya_bottom_03"
+  },
+  {
+    "id": "maya_beach_shorts_direct",
+    "feedback": "Replace the jeans with shorts.",
+    "event_id": "event_coastal_outing",
+    "member_id": "member_maya",
+    "expected_status": "applied",
+    "expected_item_id": "maya_bottom_04",
+    "forbidden_item_id": "maya_bottom_03"
+  },
+  {
+    "id": "maya_beach_shorts_preference",
+    "feedback": "I prefer navy cotton shorts rather than jeans.",
+    "event_id": "event_coastal_outing",
+    "member_id": "member_maya",
+    "expected_status": "applied",
+    "expected_item_id": "maya_bottom_04",
+    "forbidden_item_id": "maya_bottom_03"
+  },
+  {
+    "id": "arjun_missing_skirt",
+    "feedback": "Replace the jeans with a skirt.",
+    "event_id": "event_coastal_outing",
+    "member_id": "member_arjun",
+    "expected_status": "needs_input"
+  }
+]

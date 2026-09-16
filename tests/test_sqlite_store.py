@@ -21,7 +21,7 @@ def test_seed_data_is_loaded_idempotently(tmp_path):
     store.initialize(seed)
     dataset = store.load_dataset(seed)
 
-    assert len(dataset.wardrobe_items) == 30
+    assert len(dataset.wardrobe_items) == 31
     assert len(dataset.events) == 3
     assert len(dataset.weather) == 3
 
@@ -140,3 +140,37 @@ def test_saved_plan_can_be_deleted_without_deleting_its_replan(tmp_path):
     assert remaining_replan is not None
     assert remaining_replan.source_plan_id is None
     assert store.delete_saved_plan(seed.household.id, original.id) is False
+
+
+def test_saved_plan_keeps_compact_refinement_provenance_without_chat_history(tmp_path):
+    store, seed = initialized_store(tmp_path)
+    seed.demo_request.event_ids = ["event_coastal_outing"]
+    planning_state = run_demo_workflow(seed)
+    planning_state["refinement_history"] = [
+        {"user": "Use shorts", "assistant": "Replaced jeans with shorts."}
+    ]
+    planning_state["refinement"] = {
+        "accepted": True,
+        "feedback": "Use shorts",
+        "event_id": "event_coastal_outing",
+        "member_id": "member_maya",
+        "removed_item_ids": ["maya_bottom_03"],
+        "replacement_item_id": "maya_bottom_04",
+        "interpreter": "local",
+        "memory_scope": "Similar occasions",
+    }
+
+    saved_plan = store.save_plan(seed.household.id, planning_state)
+    reopened = store.get_saved_plan(saved_plan.id)
+
+    assert reopened is not None
+    assert "refinement_history" not in reopened.planning_state
+    assert "refinement" not in reopened.planning_state
+    assert reopened.planning_state["refinement_summary"] == {
+        "event_id": "event_coastal_outing",
+        "member_id": "member_maya",
+        "removed_item_ids": ["maya_bottom_03"],
+        "replacement_item_id": "maya_bottom_04",
+        "interpreter": "local",
+        "memory_scope": "Similar occasions",
+    }

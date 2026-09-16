@@ -1,5 +1,6 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from datetime import datetime
 from functools import partial
 from hashlib import sha256
@@ -15,9 +16,10 @@ from wardrobe_planner.adapters.sqlite_store import SQLiteApplicationStore
 from wardrobe_planner.data.seed_loader import load_seed_dataset
 from wardrobe_planner.domain.models import Event, WardrobeItem, WeatherSnapshot
 from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workflow
+from wardrobe_planner.workflow.refinement import refine_plan
 
 ROOT = Path(__file__).resolve().parent
-APP_STATE_VERSION = "saved-plans-replanning-v12"
+APP_STATE_VERSION = "plan-feedback-refinement-v14"
 st.set_page_config(
     page_title="Everyday / together · Wardrobe Planner", page_icon="🌿", layout="wide"
 )
@@ -52,6 +54,10 @@ if st.session_state.get("app_state_version") != APP_STATE_VERSION:
     st.session_state.pop("planning_state", None)
     st.session_state.pop("planning_job", None)
     st.session_state.pop("planning_error", None)
+    st.session_state.pop("refinement_job", None)
+    st.session_state.pop("refinement_job_source_state", None)
+    st.session_state.pop("refinement_source_state", None)
+    st.session_state.pop("refinement_source_plan_id", None)
     st.session_state["app_state_version"] = APP_STATE_VERSION
 st.session_state.setdefault("wardrobe_image_analysis_cache", {})
 member_by_id = {m.id: m for m in dataset.family_members}
@@ -107,6 +113,44 @@ def render_planning_progress():
     st.rerun()
 
 
+@st.fragment(run_every=1)
+def render_refinement_progress():
+    job = st.session_state.get("refinement_job")
+    if job is None:
+        return
+    if not job.done():
+        st.info("Applying your suggestion and validating the revised outfit…")
+        return
+
+    try:
+        outcome = job.result()
+        if outcome["status"] == "applied":
+            source_state = st.session_state.pop("refinement_job_source_state")
+            revised_state = outcome["planning_state"]
+            revised_state["app_state_version"] = APP_STATE_VERSION
+            st.session_state["refinement_source_state"] = source_state
+            source_plan_id = source_state.get("saved_plan_id") or st.session_state.get(
+                "replan_source_plan_id"
+            )
+            if source_plan_id:
+                st.session_state["refinement_source_plan_id"] = source_plan_id
+            else:
+                st.session_state.pop("refinement_source_plan_id", None)
+            st.session_state["planning_state"] = revised_state
+            st.session_state["refinement_notice"] = outcome["message"]
+        else:
+            st.session_state.pop("refinement_job_source_state", None)
+            st.session_state["refinement_warning"] = outcome["message"]
+    except Exception:  # noqa: BLE001 -- Background failures stay inside the UI boundary.
+        st.session_state.pop("refinement_job_source_state", None)
+        st.session_state["refinement_warning"] = (
+            "The refinement couldn’t finish. Try again or use Demo-safe local planning first."
+        )
+    finally:
+        st.session_state.pop("refinement_job", None)
+    st.rerun()
+
+
 def navigate(page, event_id=None):
     st.session_state["page"] = page
     if event_id:
@@ -130,11 +174,16 @@ def clear_style_item():
 
 
 def open_saved_plan(plan_id):
+    clear_refinement_context()
     saved_plan = application_store.get_saved_plan(plan_id)
     if saved_plan is None:
         st.session_state["events_notice"] = "That saved plan is no longer available."
         return
-    state = saved_plan.planning_state
+    state = deepcopy(saved_plan.planning_state)
+    # Saved plans reopen as clean planning artifacts. The accepted outfit and compact audit
+    # metadata remain, while the prior interactive conversation stays session-only.
+    state.pop("refinement_history", None)
+    state.pop("refinement", None)
     request = state.get("request") or {}
     required_item_ids = request.get("required_item_ids", [])
     preferred_item_ids = request.get("preferred_item_ids", [])
@@ -166,6 +215,7 @@ def open_saved_plan(plan_id):
 
 
 def start_replan(plan_id):
+    clear_refinement_context()
     saved_plan = application_store.get_saved_plan(plan_id)
     if saved_plan is None:
         st.session_state["events_notice"] = "That saved plan is no longer available."
@@ -196,6 +246,32 @@ def cancel_replan():
     st.session_state.pop("replan_source_state", None)
 
 
+def clear_refinement_context():
+    for key in (
+        "refinement_job",
+        "refinement_job_source_state",
+        "refinement_source_state",
+        "refinement_source_plan_id",
+        "refinement_notice",
+        "refinement_warning",
+    ):
+        st.session_state.pop(key, None)
+
+
+def accept_refinement():
+    state = st.session_state.get("planning_state")
+    if state and state.get("refinement"):
+        state["refinement"]["accepted"] = True
+        st.session_state["planning_state"] = state
+
+
+def keep_original_plan():
+    source_state = st.session_state.get("refinement_source_state")
+    if source_state:
+        st.session_state["planning_state"] = source_state
+    clear_refinement_context()
+
+
 def request_saved_plan_deletion(plan_id):
     st.session_state["pending_delete_plan_id"] = plan_id
 
@@ -222,6 +298,7 @@ def delete_saved_plan(plan_id):
 WARDROBE_FORM_KEYS = (
     "new_item_name",
     "new_item_category",
+    "new_item_garment_type",
     "new_item_color",
     "new_item_formality",
     "new_item_warmth",
@@ -240,6 +317,7 @@ def reset_wardrobe_intake():
 def apply_wardrobe_analysis(analysis):
     st.session_state["new_item_name"] = analysis["name"]
     st.session_state["new_item_category"] = analysis["category"]
+    st.session_state["new_item_garment_type"] = analysis.get("garment_type") or ""
     st.session_state["new_item_color"] = analysis["color"]
     st.session_state["new_item_formality"] = analysis["formality"]
     st.session_state["new_item_warmth"] = analysis["warmth"]
@@ -296,6 +374,7 @@ def add_wardrobe_item_dialog():
 
     st.session_state.setdefault("new_item_name", "")
     st.session_state.setdefault("new_item_category", "top")
+    st.session_state.setdefault("new_item_garment_type", "")
     st.session_state.setdefault("new_item_color", "")
     st.session_state.setdefault("new_item_formality", "casual")
     st.session_state.setdefault("new_item_warmth", "light")
@@ -319,6 +398,12 @@ def add_wardrobe_item_dialog():
             )
         with color:
             item_color = st.text_input("Color", placeholder="Blue", key="new_item_color")
+        garment_type = st.text_input(
+            "Garment type",
+            placeholder="Examples: shorts, jeans, cardigan, dress",
+            key="new_item_garment_type",
+            help="A specific garment type helps the planner apply natural-language refinements.",
+        )
         formality, warmth = st.columns(2)
         with formality:
             item_formality = st.selectbox(
@@ -353,6 +438,7 @@ def add_wardrobe_item_dialog():
             member_id=member_id,
             name=name.strip(),
             category=item_category,
+            garment_type=garment_type.strip().lower() or None,
             color=item_color.strip().lower(),
             formality=item_formality,
             seasons=seasons,
@@ -670,6 +756,137 @@ def render_replan_comparison(previous_state, current_state):
             )
 
 
+def render_refinement_panel(state):
+    st.subheader("Refine this plan")
+    st.caption(
+        "Tell the planner what you would change. It will preserve the other outfits and validate "
+        "the revision before you accept it."
+    )
+    for exchange in state.get("refinement_history", []):
+        with st.chat_message("user"):
+            st.write(exchange["user"])
+        with st.chat_message("assistant"):
+            st.write(exchange["assistant"])
+
+    if notice := st.session_state.pop("refinement_notice", None):
+        st.success(notice)
+    if warning := st.session_state.pop("refinement_warning", None):
+        st.warning(warning)
+
+    refinement = state.get("refinement")
+    if refinement and not refinement.get("accepted"):
+        st.info("Review the changed outfit above, then accept it or return to the previous plan.")
+        accept_action, keep_action = st.columns([1, 4])
+        with accept_action:
+            st.button(
+                "Accept revision",
+                key="accept_refinement",
+                on_click=accept_refinement,
+                type="primary",
+            )
+        with keep_action:
+            st.button(
+                "Keep original",
+                key="keep_original_plan",
+                on_click=keep_original_plan,
+            )
+        return
+
+    if refinement and refinement.get("accepted"):
+        st.success("Revision accepted. You can save it as a new plan or refine it again.")
+        if not refinement.get("memory_saved"):
+            memory_scope = st.selectbox(
+                "Remember this preference?",
+                ["Just this plan", "Similar occasions", "Always for this person"],
+                key="refinement_memory_scope",
+            )
+            if st.button(
+                "Remember preference",
+                key="remember_refinement_preference",
+                disabled=memory_scope == "Just this plan",
+            ):
+                memory_text = refinement["memory_text"]
+                if memory_scope == "Always for this person":
+                    intent = refinement["intent"]
+                    desired = ", ".join(intent.get("desired_terms", []))
+                    avoided = ", ".join(intent.get("avoided_terms", []))
+                    member_name = member_by_id[refinement["member_id"]].name
+                    memory_text = f"{member_name} generally prefers {desired}"
+                    if avoided:
+                        memory_text += f" instead of {avoided}"
+                    memory_text += "."
+                try:
+                    store = preference_memory(dataset.household.id)
+                    saved_memories = store.save_preference(
+                        refinement["member_id"], memory_text, "style"
+                    )
+                    cache = st.session_state.setdefault("member_memory_cache", {})
+                    cache.setdefault(refinement["member_id"], []).extend(saved_memories)
+                    refinement["memory_saved"] = True
+                    refinement["memory_scope"] = memory_scope
+                    state["refinement"] = refinement
+                    st.session_state["planning_state"] = state
+                    st.rerun()
+                except Exception:  # noqa: BLE001 -- Provider details stay behind the UI boundary.
+                    st.error("Mem0 couldn’t save this preference. The revised plan is still intact.")
+        else:
+            st.caption(f"Preference saved to Mem0 · {refinement['memory_scope']}")
+
+    event_ids = list(state["request"]["event_ids"])
+    active_job = st.session_state.get("refinement_job")
+    refinement_running = active_job is not None and not active_job.done()
+    with st.form("refine_plan_form"):
+        target_event_id = st.selectbox(
+            "Occasion to refine",
+            event_ids,
+            format_func=lambda event_id: event_by_id[event_id].name,
+            key="refinement_event_id",
+        )
+        participant_ids = event_by_id[target_event_id].participant_ids
+        target_member_id = st.selectbox(
+            "Whose outfit?",
+            participant_ids,
+            format_func=lambda member_id: member_by_id[member_id].name,
+            key="refinement_member_id",
+        )
+        feedback = st.text_area(
+            "Suggested change",
+            placeholder="Example: I would rather wear shorts at the beach than denim jeans.",
+            key="refinement_feedback",
+            height=80,
+        )
+        submit_refinement = st.form_submit_button(
+            "Suggest changes",
+            type="primary",
+            disabled=refinement_running,
+        )
+    if submit_refinement:
+        if not feedback.strip():
+            st.warning("Describe the change you would like to make.")
+        else:
+            backend = (
+                "nebius"
+                if (state.get("final_result") or {})
+                .get("workflow_metrics", {})
+                .get("agent_backend")
+                == "nebius"
+                else "local"
+            )
+            st.session_state["refinement_job_source_state"] = deepcopy(state)
+            st.session_state["refinement_job"] = planning_executor().submit(
+                refine_plan,
+                dataset.model_copy(deep=True),
+                deepcopy(state),
+                feedback,
+                target_event_id,
+                target_member_id,
+                backend=backend,
+            )
+            st.rerun()
+    if st.session_state.get("refinement_job") is not None:
+        render_refinement_progress()
+
+
 def render_results(state):
     result = state["final_result"]
     preferred_item_ids = set(state["request"].get("preferred_item_ids", []))
@@ -683,7 +900,9 @@ def render_results(state):
         st.error(result.get("error", "This plan needs review before you use it."))
         for error in result.get("validation_errors", []):
             st.write(error)
-    replan_source_state = st.session_state.get("replan_source_state")
+    replan_source_state = st.session_state.get("refinement_source_state") or st.session_state.get(
+        "replan_source_state"
+    )
     if replan_source_state:
         render_replan_comparison(replan_source_state, state)
     for event_id in state["request"]["event_ids"]:
@@ -721,19 +940,25 @@ def render_results(state):
                 )
                 st.caption(purchase["rationale"])
     if result["status"] == "valid":
+        render_refinement_panel(state)
+    if result["status"] == "valid":
         if saved_notice := st.session_state.pop("saved_plan_notice", None):
             st.success(saved_notice)
         saved_plan_id = state.get("saved_plan_id")
+        refinement_ready = not state.get("refinement") or state["refinement"].get("accepted")
         if st.button(
             "Plan saved" if saved_plan_id else "Save family plan",
             key="save_current_plan",
-            disabled=bool(saved_plan_id),
+            disabled=bool(saved_plan_id) or not refinement_ready,
             type="primary" if not saved_plan_id else "secondary",
         ):
             saved_plan = application_store.save_plan(
                 dataset.household.id,
                 state,
-                source_plan_id=st.session_state.get("replan_source_plan_id"),
+                source_plan_id=(
+                    st.session_state.get("refinement_source_plan_id")
+                    or st.session_state.get("replan_source_plan_id")
+                ),
             )
             state["saved_plan_id"] = saved_plan.id
             st.session_state["planning_state"] = state
@@ -1193,13 +1418,17 @@ else:
                 "Live planning usually takes about a minute while the AI builds all family outfits."
             )
     active_job = st.session_state.get("planning_job")
-    job_running = active_job is not None and not active_job.done()
+    active_refinement_job = st.session_state.get("refinement_job")
+    job_running = (active_job is not None and not active_job.done()) or (
+        active_refinement_job is not None and not active_refinement_job.done()
+    )
     if st.button(
         "Replan family outfits" if replan_source_state else "Generate family plan",
         type="primary",
         disabled=not selected_events or job_running or not style_item_applies,
         key="generate_plan",
     ):
+        clear_refinement_context()
         st.session_state.pop("planning_state", None)
         st.session_state.pop("planning_error", None)
         request_dataset = dataset.model_copy(deep=True)

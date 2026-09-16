@@ -20,13 +20,18 @@ flowchart LR
             CONTEXT[2. Gather planning context]
             PLAN[3. Outfit planning agent]
             VALIDATE[4. Deterministic validator]
-            REPAIR[5. Repair invalid plan]
-            PRESENT[6. Rank and present plan]
+            REPAIR[5. Agent repairs invalid plan]
+            POLICY[6. Bounded weather policy repair]
+            PRESENT[7. Rank and present plan]
+            REFINE[8. Interpret feedback and apply minimal diff]
 
             INTAKE --> CONTEXT --> PLAN --> VALIDATE
             VALIDATE -->|Valid| PRESENT
+            VALIDATE -->|Only affordable rain gaps| POLICY --> VALIDATE
             VALIDATE -->|Errors and retries remain| REPAIR --> PLAN
-            VALIDATE -->|Retry limit reached| PRESENT
+            VALIDATE -->|Rain gap remains after retries| POLICY
+            VALIDATE -->|Other errors at retry limit| PRESENT
+            PRESENT -->|Scoped user feedback| REFINE --> VALIDATE
         end
 
         TOOLS[Typed tool layer]
@@ -57,6 +62,8 @@ flowchart LR
     CONTEXT <--> TOOLS
     PLAN <--> TOOLS
     PLAN <--> NEBIUS
+    REFINE <--> NEBIUS
+    REFINE <--> TOOLS
     VALIDATE <--> SCHEMAS
 
     TOOLS <--> SQLITE
@@ -99,6 +106,7 @@ creates an authoritative wardrobe item.
 | Pinecone | Semantic retrieval of reviewed styling and dress-code guidance | Inventory, prices, or member ownership |
 | Mem0 | Member-scoped preferences learned across conversations | Events, wardrobe availability, or current hard constraints |
 | Validator | Schema, ownership, availability, coverage, explicit preference, and budget checks | Subjective style judgments |
+| Refinement service | Typed feedback interpretation, owned-alternative ranking, minimal plan diff, and revalidation | Silently persisting a situational preference |
 | LangSmith | Trace inspection, evaluation runs, latency and failure analysis | Application storage |
 
 ## Planning request flow
@@ -176,6 +184,8 @@ PlanningState
 ├── retry_count
 ├── policy_repair_attempted
 ├── policy_repairs[]
+├── refinement
+├── refinement_history[]
 ├── tool_call_count
 └── final_result
 ```
@@ -195,6 +205,36 @@ Large wardrobe or guidance collections are not copied into every model message. 
 | `policy_repair` | Candidate with an unresolved affordable rain gap | Catalog-backed rain purchase and trace record | Deterministic workflow policy |
 | `finalize` | Valid plan or terminal failure | Ranked, display-ready response | Mostly deterministic formatting |
 | `save_plan` | User-selected valid plan | Persisted plan ID | Deterministic write after user action |
+
+## Plan refinement flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as Streamlit
+    participant Interpreter as Nebius or local parser
+    participant Rules as Refinement workflow
+    participant Validator
+    participant Memory as Mem0
+
+    User->>UI: Prefer shorts instead of denim jeans
+    UI->>Interpreter: Feedback plus selected person, event, current outfit
+    Interpreter-->>UI: Typed desired and avoided garment terms
+    UI->>Rules: Find available owned alternatives
+    Rules->>Rules: Replace one matching item and preserve other outfits
+    Rules->>Validator: Validate the complete revised plan
+    Validator-->>UI: Valid revision or actionable conflict
+    UI-->>User: Before/after comparison
+    User->>UI: Accept or keep original
+    opt User explicitly chooses remember
+        UI->>Memory: Save member-scoped preference
+    end
+```
+
+The selected event and member constrain the conversation before model interpretation. The model
+extracts meaning; application code resolves authoritative item IDs and applies the smallest valid
+change. A failed match leaves the original plan intact. Accepted revisions can be saved with the
+original saved plan as their `source_plan_id`.
 
 ### Termination controls
 
