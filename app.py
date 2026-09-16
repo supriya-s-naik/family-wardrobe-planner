@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from functools import partial
 from hashlib import sha256
 from html import escape
 from pathlib import Path
@@ -846,7 +847,25 @@ else:
             + f". Use owned items first, coordinate without identical outfits, and keep all suggested purchases within ${budget:.0f} total."
             + item_instruction
         )
-        runner = run_nebius_workflow if backend == "Nebius live" else run_demo_workflow
+        if backend == "Nebius live":
+            runner = run_nebius_workflow
+        else:
+            cached_memories = {
+                member_id: [dict(memory) for memory in memories]
+                for member_id, memories in st.session_state.get(
+                    "member_memory_cache", {}
+                ).items()
+            }
+            if any(cached_memories.values()):
+                def search_cached_memories(member_id: str, _query: str, limit: int):
+                    return cached_memories.get(member_id, [])[:limit]
+
+                runner = partial(
+                    run_demo_workflow,
+                    memory_search=search_cached_memories,
+                )
+            else:
+                runner = run_demo_workflow
         st.session_state["planning_job"] = planning_executor().submit(runner, request_dataset)
         st.rerun()
     if st.session_state.get("planning_job") is not None:

@@ -150,9 +150,25 @@ def test_family_page_can_save_and_display_member_scoped_memory():
         app.selectbox(key="memory_member_id").select("member_maya").run()
         app.button(key="FormSubmitter:save_preference_form-Remember preference").click().run()
 
+        app.radio(key="page").set_value("Plan outfits").run()
+        app.multiselect(key="selected_events").set_value(["event_coastal_outing"]).run()
+        app.radio[1].set_value("Demo-safe local").run()
+        app.button(key="generate_plan").click().run(timeout=15)
+        app = await_plan(app)
+
     assert not app.exception
-    assert any("Maya prefers flats for long walks" in block.value for block in app.markdown)
     assert store.rows[0]["member_id"] == "member_maya"
+    result = app.session_state["planning_state"]["final_result"]
+    maya_outfit = next(
+        outfit for outfit in result["outfits"] if outfit["member_id"] == "member_maya"
+    )
+    assert "maya_shoe_01" in maya_outfit["item_ids"]
+    memory_result = next(
+        row
+        for row in app.session_state["planning_state"]["tool_results"]
+        if row["name"] == "search_memories"
+    )["result"]
+    assert memory_result["memories_by_member"]["member_arjun"] == []
 
 
 def test_failed_planning_renders_without_empty_columns():

@@ -231,8 +231,12 @@ def build_planning_graph(
     return graph.compile()
 
 
-def run_demo_workflow(dataset: SeedDataset) -> PlanningState:
-    graph = build_planning_graph(dataset, LocalPlanningAgent())
+def run_demo_workflow(dataset: SeedDataset, memory_search=None) -> PlanningState:
+    graph = build_planning_graph(
+        dataset,
+        LocalPlanningAgent(),
+        memory_search=memory_search,
+    )
     return graph.invoke({"request": dataset.demo_request.model_dump(mode="json")})
 
 
