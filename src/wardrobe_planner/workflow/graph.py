@@ -8,6 +8,7 @@ from openai import OpenAIError
 from pydantic import ValidationError
 
 from wardrobe_planner.adapters.local import LocalPlanningData
+from wardrobe_planner.adapters.mem0_memory import Mem0PreferenceMemory
 from wardrobe_planner.adapters.pinecone_rag import PineconeGuidanceRAG
 from wardrobe_planner.domain.models import DemoRequest, SeedDataset
 from wardrobe_planner.domain.plans import OutfitPlan
@@ -18,7 +19,7 @@ from wardrobe_planner.workflow.state import PlanningState
 from wardrobe_planner.workflow.tools import ToolExecutor
 from wardrobe_planner.workflow.validator import validate_plan
 
-MAX_TOOL_CALLS = 8
+MAX_TOOL_CALLS = 9
 MAX_REPAIR_ATTEMPTS = 2
 
 
@@ -26,9 +27,14 @@ def build_planning_graph(
     dataset: SeedDataset,
     agent: PlanningAgent | None = None,
     guidance_search=None,
+    memory_search=None,
 ):
     data = LocalPlanningData(dataset)
-    tools = ToolExecutor(data, guidance_search=guidance_search)
+    tools = ToolExecutor(
+        data,
+        guidance_search=guidance_search,
+        memory_search=memory_search,
+    )
     planning_agent = agent or LocalPlanningAgent()
 
     def load_context(state: PlanningState) -> dict[str, Any]:
@@ -235,10 +241,17 @@ def run_nebius_workflow(dataset: SeedDataset) -> PlanningState:
         guidance_search = PineconeGuidanceRAG.from_env().search_guidance
     except RuntimeError:
         guidance_search = None
+    try:
+        memory_search = Mem0PreferenceMemory.from_env(
+            dataset.household.id
+        ).search_preferences
+    except RuntimeError:
+        memory_search = None
     graph = build_planning_graph(
         dataset,
         NebiusPlanningAgent(),
         guidance_search=guidance_search,
+        memory_search=memory_search,
     )
     return graph.invoke({"request": dataset.demo_request.model_dump(mode="json")})
 

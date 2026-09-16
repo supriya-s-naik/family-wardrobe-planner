@@ -13,7 +13,11 @@ from pydantic import BaseModel, Field
 from wardrobe_planner.adapters.nebius import NebiusModel
 from wardrobe_planner.domain.models import SeedDataset
 from wardrobe_planner.domain.plans import OutfitPlan
-from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workflow
+from wardrobe_planner.workflow.graph import (
+    build_planning_graph,
+    run_demo_workflow,
+    run_nebius_workflow,
+)
 from wardrobe_planner.workflow.validator import validate_plan
 
 
@@ -29,6 +33,8 @@ class EvalCase(BaseModel):
     required_tools: list[str] = Field(default_factory=list)
     max_tool_calls: int = Field(gt=0)
     repeat_runs: int = Field(default=1, ge=1, le=3)
+    remembered_preferences: dict[str, list[str]] = Field(default_factory=dict)
+    expected_memory_item_ids: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class EvalResult(BaseModel):
@@ -106,7 +112,26 @@ def evaluate_case(
             item.available = False
 
     started_at = perf_counter()
-    states = [runner(dataset) for _ in range(case.repeat_runs)]
+    if case.remembered_preferences and backend == "local":
+        def fixture_memory_search(member_id: str, _query: str, limit: int):
+            return [
+                {
+                    "id": f"eval-memory-{member_id}-{index}",
+                    "member_id": member_id,
+                    "text": text,
+                    "category": "evaluation_fixture",
+                    "provider": "mem0_fixture",
+                }
+                for index, text in enumerate(case.remembered_preferences.get(member_id, [])[:limit])
+            ]
+
+        def case_runner(case_dataset: SeedDataset):
+            graph = build_planning_graph(case_dataset, memory_search=fixture_memory_search)
+            return graph.invoke({"request": case_dataset.demo_request.model_dump(mode="json")})
+    else:
+        case_runner = runner
+
+    states = [case_runner(dataset) for _ in range(case.repeat_runs)]
     elapsed_ms = round((perf_counter() - started_at) * 1000)
     state = states[0]
     final = state.get("final_result") or {}
@@ -150,6 +175,27 @@ def evaluate_case(
     actual_pairs = {
         (outfit.event_id, outfit.member_id) for outfit in (plan.outfits if plan else [])
     }
+    memories_by_member = _retrieved_memories_by_member(state)
+    memory_rows_are_isolated = all(
+        row.get("member_id") == member_id
+        for member_id, rows in memories_by_member.items()
+        for row in rows
+    )
+    expected_memory_texts_retrieved = all(
+        set(expected_texts).issubset({row.get("text") for row in memories_by_member.get(member_id, [])})
+        for member_id, expected_texts in case.remembered_preferences.items()
+    )
+    expected_memory_items_used = all(
+        set(expected_item_ids).issubset(
+            {
+                item_id
+                for outfit in (plan.outfits if plan else [])
+                if outfit.member_id == member_id
+                for item_id in outfit.item_ids
+            }
+        )
+        for member_id, expected_item_ids in case.expected_memory_item_ids.items()
+    )
 
     deterministic_errors = (
         validate_plan(plan, dataset, case.event_ids) if plan is not None else ["No valid plan"]
@@ -191,6 +237,8 @@ def evaluate_case(
         and all(outfit.guidance_ids for outfit in plan.outfits)
         and cited_guidance_ids.issubset(retrieved_guidance_ids),
         "unavailable_items_excluded": not selected_item_ids.intersection(case.forbidden_item_ids),
+        "memory_isolation": memory_rows_are_isolated and expected_memory_texts_retrieved,
+        "memory_application": expected_memory_items_used,
         "repeatability": _canonical_plan(states[0]) == _canonical_plan(states[-1]),
     }
     for name, passed in checks.items():
@@ -212,6 +260,7 @@ def evaluate_case(
             "retrieved_guidance_ids": sorted(retrieved_guidance_ids),
             "cited_guidance_ids": sorted(cited_guidance_ids),
             "validation_errors": deterministic_errors,
+            "retrieved_memory_count": sum(len(rows) for rows in memories_by_member.values()),
         },
         failures=failures,
     )
@@ -308,6 +357,15 @@ def _retrieved_guidance(state: dict[str, Any]) -> list[dict[str, Any]]:
         if record["name"] == "prepare_planning_context":
             return record["result"].get("guidance", [])
     return []
+
+
+def _retrieved_memories_by_member(
+    state: dict[str, Any],
+) -> dict[str, list[dict[str, Any]]]:
+    for record in state.get("tool_results", []):
+        if record["name"] == "search_memories":
+            return record["result"].get("memories_by_member", {})
+    return {}
 
 
 def _canonical_plan(state: dict[str, Any]) -> str:

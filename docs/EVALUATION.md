@@ -26,7 +26,11 @@ Publish the full local suite as a named LangSmith dataset and experiment:
 uv run --offline python scripts/run_langsmith_evals.py
 ```
 
-The 12 cases in `evals/cases.json` cover single and multi-event planning, zero-budget requests, unavailable wardrobe items, retrieval relevance, grounded citations, required tool use, hard constraints, and repeatability. The local backend is the regression baseline. The live backend runs the same cases through Nebius and deterministic validation.
+The 13 cases in `evals/cases.json` cover single and multi-event planning, zero-budget requests,
+unavailable wardrobe items, retrieval relevance, grounded citations, required tool use, hard
+constraints, repeatability, member-scoped memory retrieval, and observable memory application.
+The local backend is the regression baseline. The live backend runs the same planning and
+validation contracts through Nebius.
 
 Each case reports these binary checks:
 
@@ -41,18 +45,24 @@ Each case reports these binary checks:
 - Expected guidance retrieval
 - Citations grounded in retrieved guidance
 - Explicit exclusion of unavailable items
+- Memory isolation between family members
+- Expected use of a retrieved preference
 - Repeatability
 
 `evals/results/latest.json` contains machine-readable evidence. `evals/results/latest.md` is the submission-friendly summary. Styling appropriateness remains subjective and uses `evals/HUMAN_RUBRIC.md`; human ratings are never merged into the objective pass rate.
 
-The Nebius path intentionally exposes one controlled `prepare_planning_context` tool call. That tool performs wardrobe, weather, catalog, and Pinecone retrieval before the model composes a typed plan. The local regression backend exposes the equivalent granular calls, making the workflow-versus-agent boundary visible in both modes.
+The Nebius path intentionally exposes two controlled tool calls: `prepare_planning_context` for
+wardrobe, weather, catalog, and Pinecone retrieval, followed by member-scoped `search_memories`.
+The model then composes a typed plan. The local regression backend exposes the equivalent granular
+calls, making the workflow-versus-agent boundary visible in both modes.
 
 LangSmith tracing is enabled through `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, and `LANGSMITH_ENDPOINT`. The hosted experiment records four objective scores per case: overall pass, hard constraints, RAG grounding, and bounded tool use. Local JSON/Markdown reports remain available when LangSmith is offline.
 
 ## Recorded evidence
 
-- Local regression report: 12/12 cases passed.
-- Live Nebius/Pinecone report: `coastal_standard` passed with one tool call, two grounded guidance IDs, and zero validation errors.
+- Local regression report: 13/13 cases passed, including the member-isolation memory case.
+- Live Nebius/Pinecone/Mem0 report: `coastal_standard` is recorded separately in
+  `evals/results/nebius-coastal.*`.
 - LangSmith dataset: `wardrobe-planner-evals-v1`.
 - LangSmith experiment: `wardrobe-planner-local-087409b9`.
 - Advisory model judge: `coastal_standard` received 4.8/5 with evidence for every rubric category.

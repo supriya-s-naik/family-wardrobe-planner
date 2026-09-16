@@ -29,6 +29,26 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "search_memories",
+            "description": (
+                "Retrieve durable clothing, style, and comfort preferences for the selected "
+                "family members. Results are isolated by member ID."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "member_ids": {"type": "array", "items": {"type": "string"}},
+                    "query": {"type": "string", "minLength": 1},
+                    "limit_per_member": {"type": "integer", "minimum": 1, "maximum": 10},
+                },
+                "required": ["member_ids", "query", "limit_per_member"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "search_wardrobe",
             "description": "Find available owned items for one family member.",
             "parameters": {
@@ -112,9 +132,11 @@ class ToolExecutor:
         data: LocalPlanningData,
         guidance_search: Callable[[list[str], int, list[str] | None], list[dict[str, Any]]]
         | None = None,
+        memory_search: Callable[[str, str, int], list[dict[str, Any]]] | None = None,
     ) -> None:
         self.data = data
         self.guidance_search = guidance_search
+        self.memory_search = memory_search
 
     def execute(
         self, name: str, arguments: dict[str, Any]
@@ -167,6 +189,56 @@ class ToolExecutor:
                 limit=int(arguments.get("limit", 20)),
             )
             return [item.model_dump(mode="json") for item in results]
+        if name == "search_memories":
+            member_ids = [str(member_id) for member_id in arguments["member_ids"]]
+            known_member_ids = {member.id for member in self.data.dataset.family_members}
+            unknown_member_ids = sorted(set(member_ids) - known_member_ids)
+            if unknown_member_ids:
+                raise ValueError(f"Memory search requested unknown member IDs: {unknown_member_ids}")
+            query = str(arguments["query"]).strip()
+            if not query:
+                raise ValueError("Memory search query cannot be empty")
+            limit = int(arguments.get("limit_per_member", 5))
+            memories_by_member: dict[str, list[dict[str, Any]]] = {
+                member_id: [] for member_id in member_ids
+            }
+            if self.memory_search is None:
+                return {
+                    "memories_by_member": memories_by_member,
+                    "retrieval_metadata": {
+                        "provider": "not_configured",
+                        "query": query,
+                        "match_count": 0,
+                        "fallback_used": True,
+                        "fallback_reason": "Mem0NotConfigured",
+                    },
+                }
+            try:
+                for member_id in member_ids:
+                    matches = self.memory_search(member_id, query, limit)
+                    memories_by_member[member_id] = [
+                        {**match, "member_id": member_id} for match in matches
+                    ]
+            except Exception as exc:  # noqa: BLE001 -- memory must not block planning.
+                return {
+                    "memories_by_member": {member_id: [] for member_id in member_ids},
+                    "retrieval_metadata": {
+                        "provider": "unavailable",
+                        "query": query,
+                        "match_count": 0,
+                        "fallback_used": True,
+                        "fallback_reason": type(exc).__name__,
+                    },
+                }
+            return {
+                "memories_by_member": memories_by_member,
+                "retrieval_metadata": {
+                    "provider": "mem0",
+                    "query": query,
+                    "match_count": sum(len(rows) for rows in memories_by_member.values()),
+                    "fallback_used": False,
+                },
+            }
         if name == "get_weather":
             return self.data.get_weather(str(arguments["weather_key"])).model_dump(mode="json")
         if name == "search_style_guidance":

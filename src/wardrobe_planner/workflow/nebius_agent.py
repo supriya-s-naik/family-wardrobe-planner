@@ -16,13 +16,9 @@ class NebiusPlanningAgent:
         self.model = model or NebiusModel()
 
     def next_tool_calls(self, state: dict[str, Any]) -> list[dict[str, Any]]:
-        if any(
-            result["name"] == "prepare_planning_context" for result in state.get("tool_results", [])
-        ):
-            return []
-
-        return [
-            {
+        results = state.get("tool_results", [])
+        if not any(result["name"] == "prepare_planning_context" for result in results):
+            return [{
                 "name": "prepare_planning_context",
                 "arguments": {
                     "member_ids": [
@@ -36,8 +32,30 @@ class NebiusPlanningAgent:
                     "plan generation."
                 ),
                 "actor": "workflow",
-            },
-        ]
+            }]
+        if not any(result["name"] == "search_memories" for result in results):
+            events = state["household_context"]["events"]
+            event_context = ", ".join(
+                f"{event['name']} {event['dress_code']} {event['setting']} "
+                + " ".join(event["activities"])
+                for event in events
+            )
+            return [{
+                "name": "search_memories",
+                "arguments": {
+                    "member_ids": [
+                        member["id"] for member in state["household_context"]["members"]
+                    ],
+                    "query": (
+                        "Relevant clothing, footwear, color, comfort, cultural, and outfit "
+                        f"repeat preferences for: {event_context}"
+                    ),
+                    "limit_per_member": 5,
+                },
+                "reason": "Recall durable preferences for each participating family member.",
+                "actor": "workflow",
+            }]
+        return []
 
     def compose_plan(self, state: dict[str, Any]) -> OutfitPlan:
         payload = {
@@ -58,6 +76,9 @@ class NebiusPlanningAgent:
                 "one is skipped, explain the event-fit reason in that member's outfit rationale. "
                 "Treat required_item_ids as a hard constraint: include each item in its owner's "
                 "outfit for every selected event that owner attends. "
+                "Apply retrieved memories only to the member_id attached to each memory. Treat "
+                "them as soft preferences; the current request and authoritative constraints "
+                "take precedence. Mention an applied memory in the outfit rationale. "
                 "Respect member preferences, event conditions, and the total purchase budget. "
                 "Follow the retrieved guidance and cite at least one retrieved guidance ID in "
                 "every outfit. Use only guidance IDs that were actually retrieved. "

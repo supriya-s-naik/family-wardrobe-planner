@@ -183,7 +183,8 @@ Large wardrobe or guidance collections are not copied into every model message. 
 
 ### Termination controls
 
-- Maximum application tool calls per run: 8; the live path currently uses one aggregate context call.
+- Maximum application tool calls per run: 9; the live path uses one aggregate context call plus
+  one member-scoped memory retrieval call.
 - Maximum validation repair attempts: 2.
 - A plan cannot be marked valid unless all hard checks pass.
 - A tool error is returned as structured state; the model does not receive stack traces or secrets.
@@ -299,11 +300,10 @@ flowchart TB
 - Logs and traces avoid raw secrets and unnecessary personal data.
 - Production authentication and multi-household isolation remain outside this prototype's scope.
 
-## Architecture decisions still requiring a spike
+## Remaining architecture spike
 
-1. Select the Nebius-hosted model after testing tool-call accuracy and structured-output adherence.
-2. Confirm Mem0 project access and member-scoped metadata behavior.
-3. Confirm Pinecone index dimension or integrated embedding configuration.
-4. Choose the live weather API while keeping the seeded adapter as the demo fallback.
+Choose the live weather API while keeping the seeded adapter as the demo fallback.
 
-The Nebius integration decision is resolved: a custom planning-agent adapter uses Nebius's OpenAI-compatible client while LangGraph retains ownership of state transitions, tool execution, validation, retries, and termination.
+The managed-service decisions are implemented: Nebius provides model inference, Pinecone retrieves
+reviewed guidance, and Mem0 stores and searches member-scoped durable preferences. LangGraph retains
+ownership of state transitions, tool execution, validation, retries, and termination.

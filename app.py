@@ -7,13 +7,14 @@ from uuid import uuid4
 
 import streamlit as st
 
+from wardrobe_planner.adapters.mem0_memory import Mem0PreferenceMemory
 from wardrobe_planner.adapters.nebius import NebiusModel
 from wardrobe_planner.data.seed_loader import load_seed_dataset
 from wardrobe_planner.domain.models import Event, WardrobeItem, WeatherSnapshot
 from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workflow
 
 ROOT = Path(__file__).resolve().parent
-APP_STATE_VERSION = "style-item-request-v9"
+APP_STATE_VERSION = "mem0-preferences-v10"
 st.set_page_config(
     page_title="Everyday / together · Wardrobe Planner", page_icon="🌿", layout="wide"
 )
@@ -59,6 +60,11 @@ COLORS = {
 @st.cache_resource
 def planning_executor():
     return ThreadPoolExecutor(max_workers=2, thread_name_prefix="wardrobe-planner")
+
+
+@st.cache_resource
+def preference_memory(household_id: str):
+    return Mem0PreferenceMemory.from_env(household_id)
 
 
 @st.fragment(run_every=1)
@@ -378,6 +384,87 @@ def family_cards():
             )
 
 
+def memory_manager():
+    st.subheader("Remembered preferences")
+    st.write(
+        "Save a lasting preference only when someone has clearly expressed it. "
+        "Mem0 keeps each family member’s memories separate."
+    )
+    selected_member_id = st.selectbox(
+        "Family member",
+        list(member_by_id),
+        format_func=lambda member_id: member_by_id[member_id].name,
+        key="memory_member_id",
+    )
+    try:
+        store = preference_memory(dataset.household.id)
+    except RuntimeError:
+        st.warning("Mem0 is unavailable. Add MEM0_API_KEY to enable durable preferences.")
+        return
+
+    memory_cache = st.session_state.setdefault("member_memory_cache", {})
+    refresh_requested = st.button("Refresh from Mem0", key="refresh_memories")
+    if selected_member_id not in memory_cache or refresh_requested:
+        try:
+            memory_cache[selected_member_id] = store.list_preferences(selected_member_id)
+        except Exception:  # noqa: BLE001 -- keep the preference UI usable after provider failure.
+            st.error("Mem0 couldn’t load preferences. Please try again.")
+            memory_cache.setdefault(selected_member_id, [])
+
+    with st.form("save_preference_form", clear_on_submit=True):
+        preference_text = st.text_area(
+            "Preference to remember",
+            placeholder="Example: Maya prefers flats for events with extensive walking.",
+        )
+        preference_category = st.selectbox(
+            "Preference category",
+            ["comfort", "footwear", "color", "style", "cultural", "outfit_repeat"],
+        )
+        save_preference = st.form_submit_button("Remember preference", type="primary")
+    if save_preference:
+        if not preference_text.strip():
+            st.warning("Enter a preference before saving.")
+        else:
+            try:
+                store.save_preference(
+                    selected_member_id,
+                    preference_text,
+                    preference_category,
+                )
+                memory_cache[selected_member_id] = store.list_preferences(selected_member_id)
+                st.success(
+                    f"Preference saved for {member_by_id[selected_member_id].name}."
+                )
+            except Exception:  # noqa: BLE001 -- provider details stay behind the UI boundary.
+                st.error("Mem0 couldn’t save this preference. Please try again.")
+
+    memories = memory_cache.get(selected_member_id, [])
+    if not memories:
+        st.info(f"No durable preferences saved for {member_by_id[selected_member_id].name} yet.")
+        return
+    for memory in memories:
+        with st.container(border=True):
+            details, action = st.columns([5, 1], vertical_alignment="center")
+            with details:
+                st.write(memory["text"])
+                st.caption(f"{memory['category'].replace('_', ' ').title()} · Mem0")
+            with action:
+                memory_id = memory.get("id")
+                if st.button(
+                    "Delete",
+                    key=f"delete_memory_{memory_id}",
+                    disabled=not memory_id,
+                ):
+                    try:
+                        store.delete_preference(memory_id)
+                        memory_cache[selected_member_id] = [
+                            row for row in memories if row.get("id") != memory_id
+                        ]
+                        st.rerun()
+                    except Exception:  # noqa: BLE001
+                        st.error("Mem0 couldn’t delete this preference. Please try again.")
+
+
 def render_results(state):
     result = state["final_result"]
     preferred_item_ids = set(state["request"].get("preferred_item_ids", []))
@@ -471,6 +558,30 @@ def render_results(state):
                 st.write(f"**{document['title']}**{score_text}")
                 st.caption(f"{document['source']} · `{document['id']}`")
                 st.write(document["text"])
+        memory_record = next(
+            (
+                record
+                for record in state.get("tool_results", [])
+                if record["name"] == "search_memories"
+            ),
+            None,
+        )
+        if memory_record:
+            memory_context = memory_record["result"]
+            memory_retrieval = memory_context.get("retrieval_metadata", {})
+            st.markdown("#### Remembered preferences")
+            st.caption(
+                f"Provider: {memory_retrieval.get('provider', 'unknown')} · "
+                f"Matches: {memory_retrieval.get('match_count', 0)}"
+            )
+            if memory_retrieval.get("fallback_used"):
+                st.warning(
+                    "Mem0 was unavailable for this run; planning continued with saved family "
+                    "profile preferences only."
+                )
+            for member_id, memories in memory_context.get("memories_by_member", {}).items():
+                for memory in memories:
+                    st.write(f"**{member_by_id[member_id].name}:** {memory['text']}")
 
 
 brand, household = st.columns([3, 1])
@@ -535,6 +646,7 @@ elif page == "Family":
     st.title("Different people. Personal preferences.")
     st.write("Comfort comes first, for everyone.")
     family_cards()
+    memory_manager()
 elif page == "Wardrobe":
     st.title("Good things, already yours.")
     st.write("Explore your family’s closet, one person at a time.")

@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-13T01:31:16.355476+00:00",
+  "generated_at": "2026-09-16T00:08:43.931697+00:00",
   "backend": "local",
-  "passed_cases": 12,
-  "total_cases": 12,
+  "passed_cases": 13,
+  "total_cases": 13,
   "pass_rate": 1.0,
   "results": [
     {
@@ -25,13 +25,15 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 3,
         "purchase_cost": 0.0,
         "owned_items_used": 12,
-        "tool_calls": 5,
+        "tool_calls": 6,
         "latency_ms": 18,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
@@ -43,7 +45,8 @@
           "guide_child_comfort",
           "guide_smart_casual_school"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 0
       },
       "failures": []
     },
@@ -67,14 +70,16 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 3,
         "purchase_cost": 0.0,
         "owned_items_used": 11,
-        "tool_calls": 5,
-        "latency_ms": 15,
+        "tool_calls": 6,
+        "latency_ms": 14,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_festive_family",
@@ -85,7 +90,8 @@
           "guide_child_comfort",
           "guide_festive_family"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 0
       },
       "failures": []
     },
@@ -109,13 +115,15 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 3,
         "purchase_cost": 96.0,
         "owned_items_used": 10,
-        "tool_calls": 6,
+        "tool_calls": 7,
         "latency_ms": 14,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
@@ -128,7 +136,8 @@
           "guide_child_comfort",
           "guide_coastal_layers"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 0
       },
       "failures": []
     },
@@ -152,14 +161,16 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 9,
         "purchase_cost": 96.0,
         "owned_items_used": 30,
-        "tool_calls": 8,
-        "latency_ms": 30,
+        "tool_calls": 9,
+        "latency_ms": 32,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_coastal_layers",
@@ -173,7 +184,8 @@
           "guide_purchase_reuse",
           "guide_smart_casual_school"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 0
       },
       "failures": []
     },
@@ -197,14 +209,16 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 3,
         "purchase_cost": 0.0,
         "owned_items_used": 12,
-        "tool_calls": 5,
-        "latency_ms": 13,
+        "tool_calls": 6,
+        "latency_ms": 14,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_purchase_reuse",
@@ -215,7 +229,8 @@
           "guide_child_comfort",
           "guide_smart_casual_school"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 0
       },
       "failures": []
     },
@@ -239,13 +254,15 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 3,
         "purchase_cost": 0.0,
         "owned_items_used": 11,
-        "tool_calls": 5,
+        "tool_calls": 6,
         "latency_ms": 14,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
@@ -257,7 +274,8 @@
           "guide_child_comfort",
           "guide_festive_family"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 0
       },
       "failures": []
     },
@@ -281,14 +299,16 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 3,
         "purchase_cost": 0.0,
         "owned_items_used": 10,
-        "tool_calls": 6,
-        "latency_ms": 14,
+        "tool_calls": 7,
+        "latency_ms": 15,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_coastal_layers",
@@ -300,7 +320,8 @@
           "guide_child_comfort",
           "guide_coastal_layers"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 0
       },
       "failures": []
     },
@@ -324,13 +345,15 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 9,
         "purchase_cost": 0.0,
         "owned_items_used": 30,
-        "tool_calls": 8,
+        "tool_calls": 9,
         "latency_ms": 16,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
@@ -345,7 +368,8 @@
           "guide_purchase_reuse",
           "guide_smart_casual_school"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 0
       },
       "failures": []
     },
@@ -369,14 +393,16 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 3,
         "purchase_cost": 96.0,
         "owned_items_used": 10,
-        "tool_calls": 6,
-        "latency_ms": 15,
+        "tool_calls": 7,
+        "latency_ms": 83,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_coastal_layers",
@@ -388,7 +414,8 @@
           "guide_child_comfort",
           "guide_coastal_layers"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 0
       },
       "failures": []
     },
@@ -412,14 +439,16 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 3,
         "purchase_cost": 96.0,
         "owned_items_used": 10,
-        "tool_calls": 6,
-        "latency_ms": 14,
+        "tool_calls": 7,
+        "latency_ms": 15,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_coastal_layers",
@@ -431,7 +460,8 @@
           "guide_child_comfort",
           "guide_coastal_layers"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 0
       },
       "failures": []
     },
@@ -455,13 +485,15 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 3,
         "purchase_cost": 0.0,
         "owned_items_used": 12,
-        "tool_calls": 5,
+        "tool_calls": 6,
         "latency_ms": 14,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
@@ -473,7 +505,8 @@
           "guide_child_comfort",
           "guide_smart_casual_school"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 0
       },
       "failures": []
     },
@@ -497,14 +530,16 @@
         "retrieval_relevance": true,
         "grounded_citations": true,
         "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
         "repeatability": true
       },
       "measurements": {
         "outfit_count": 3,
         "purchase_cost": 0.0,
         "owned_items_used": 11,
-        "tool_calls": 5,
-        "latency_ms": 13,
+        "tool_calls": 6,
+        "latency_ms": 14,
         "retrieved_guidance_ids": [
           "guide_child_comfort",
           "guide_festive_family",
@@ -515,7 +550,54 @@
           "guide_child_comfort",
           "guide_festive_family"
         ],
-        "validation_errors": []
+        "validation_errors": [],
+        "retrieved_memory_count": 0
+      },
+      "failures": []
+    },
+    {
+      "case_id": "coastal_maya_remembered_flats",
+      "description": "A member-scoped footwear memory changes Maya's coastal outfit without leaking to other family members.",
+      "backend": "local",
+      "passed": true,
+      "checks": {
+        "schema_validity": true,
+        "workflow_valid": true,
+        "item_exists": true,
+        "correct_owner": true,
+        "item_available": true,
+        "hard_preference_compliance": true,
+        "event_formality": true,
+        "participant_coverage": true,
+        "hard_constraint_compliance": true,
+        "budget_compliance": true,
+        "tool_use": true,
+        "retrieval_relevance": true,
+        "grounded_citations": true,
+        "unavailable_items_excluded": true,
+        "memory_isolation": true,
+        "memory_application": true,
+        "repeatability": true
+      },
+      "measurements": {
+        "outfit_count": 3,
+        "purchase_cost": 96.0,
+        "owned_items_used": 10,
+        "tool_calls": 7,
+        "latency_ms": 15,
+        "retrieved_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers",
+          "guide_purchase_reuse",
+          "guide_repeat_balance",
+          "guide_smart_casual_school"
+        ],
+        "cited_guidance_ids": [
+          "guide_child_comfort",
+          "guide_coastal_layers"
+        ],
+        "validation_errors": [],
+        "retrieved_memory_count": 1
       },
       "failures": []
     }

@@ -44,7 +44,7 @@ def test_generate_family_plan_button_completes_workflow():
     assert not app.exception
     assert "Your family plan is ready" in app.success[0].value
     assert (
-        app.session_state["planning_state"]["final_result"]["workflow_metrics"]["tool_calls"] == 8
+        app.session_state["planning_state"]["final_result"]["workflow_metrics"]["tool_calls"] == 9
     )
     app.number_input[0].set_value(0).run()
     assert not app.success
@@ -114,6 +114,45 @@ def test_style_this_item_can_be_required_in_a_plan():
     )
     assert result["status"] == "valid"
     assert "maya_top_03" in maya_outfit["item_ids"]
+
+
+def test_family_page_can_save_and_display_member_scoped_memory():
+    class FakePreferenceStore:
+        def __init__(self):
+            self.rows = []
+
+        def list_preferences(self, member_id):
+            return [row for row in self.rows if row["member_id"] == member_id]
+
+        def save_preference(self, member_id, text, category):
+            row = {
+                "id": "memory_1",
+                "member_id": member_id,
+                "text": text,
+                "category": category,
+                "provider": "mem0",
+            }
+            self.rows.append(row)
+            return [row]
+
+        def delete_preference(self, memory_id):
+            self.rows = [row for row in self.rows if row["id"] != memory_id]
+
+    store = FakePreferenceStore()
+    with patch(
+        "wardrobe_planner.adapters.mem0_memory.Mem0PreferenceMemory.from_env",
+        return_value=store,
+    ):
+        app = start()
+        app.radio(key="page").set_value("Family").run()
+        assert not app.exception
+        app.text_area[0].set_value("Maya prefers flats for long walks").run()
+        app.selectbox(key="memory_member_id").select("member_maya").run()
+        app.button(key="FormSubmitter:save_preference_form-Remember preference").click().run()
+
+    assert not app.exception
+    assert any("Maya prefers flats for long walks" in block.value for block in app.markdown)
+    assert store.rows[0]["member_id"] == "member_maya"
 
 
 def test_failed_planning_renders_without_empty_columns():

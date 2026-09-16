@@ -7,7 +7,7 @@
     "expected_outfit_count": 3,
     "expected_guidance_ids": ["guide_smart_casual_school"],
     "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance"],
-    "max_tool_calls": 8
+    "max_tool_calls": 9
   },
   {
     "id": "festive_standard",
@@ -17,7 +17,7 @@
     "expected_outfit_count": 3,
     "expected_guidance_ids": ["guide_festive_family"],
     "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance"],
-    "max_tool_calls": 8
+    "max_tool_calls": 9
   },
   {
     "id": "coastal_standard",
@@ -27,7 +27,7 @@
     "expected_outfit_count": 3,
     "expected_guidance_ids": ["guide_coastal_layers"],
     "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance", "search_sample_catalog"],
-    "max_tool_calls": 8
+    "max_tool_calls": 9
   },
   {
     "id": "multi_event_standard",
@@ -37,7 +37,7 @@
     "expected_outfit_count": 9,
     "expected_guidance_ids": ["guide_smart_casual_school", "guide_festive_family", "guide_coastal_layers"],
     "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance", "search_sample_catalog"],
-    "max_tool_calls": 8,
+    "max_tool_calls": 9,
     "repeat_runs": 2
   },
   {
@@ -48,7 +48,7 @@
     "expected_outfit_count": 3,
     "expected_guidance_ids": ["guide_smart_casual_school"],
     "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance"],
-    "max_tool_calls": 8
+    "max_tool_calls": 9
   },
   {
     "id": "festive_zero_budget",
@@ -58,7 +58,7 @@
     "expected_outfit_count": 3,
     "expected_guidance_ids": ["guide_festive_family"],
     "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance"],
-    "max_tool_calls": 8
+    "max_tool_calls": 9
   },
   {
     "id": "coastal_zero_budget",
@@ -68,7 +68,7 @@
     "expected_outfit_count": 3,
     "expected_guidance_ids": ["guide_coastal_layers"],
     "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance", "search_sample_catalog"],
-    "max_tool_calls": 8
+    "max_tool_calls": 9
   },
   {
     "id": "multi_event_zero_budget",
@@ -78,7 +78,7 @@
     "expected_outfit_count": 9,
     "expected_guidance_ids": ["guide_smart_casual_school", "guide_festive_family", "guide_coastal_layers"],
     "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance", "search_sample_catalog"],
-    "max_tool_calls": 8
+    "max_tool_calls": 9
   },
   {
     "id": "coastal_maya_sneakers_unavailable",
@@ -90,7 +90,7 @@
     "expected_outfit_count": 3,
     "expected_guidance_ids": ["guide_coastal_layers"],
     "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance", "search_sample_catalog"],
-    "max_tool_calls": 8
+    "max_tool_calls": 9
   },
   {
     "id": "coastal_anaya_sneakers_unavailable",
@@ -102,7 +102,7 @@
     "expected_outfit_count": 3,
     "expected_guidance_ids": ["guide_coastal_layers"],
     "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance", "search_sample_catalog"],
-    "max_tool_calls": 8
+    "max_tool_calls": 9
   },
   {
     "id": "school_arjun_loafers_unavailable",
@@ -114,7 +114,7 @@
     "expected_outfit_count": 3,
     "expected_guidance_ids": ["guide_smart_casual_school"],
     "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance"],
-    "max_tool_calls": 8
+    "max_tool_calls": 9
   },
   {
     "id": "festive_anaya_kurta_unavailable",
@@ -126,6 +126,22 @@
     "expected_outfit_count": 3,
     "expected_guidance_ids": ["guide_festive_family"],
     "required_tools": ["search_wardrobe", "get_weather", "search_style_guidance"],
-    "max_tool_calls": 8
+    "max_tool_calls": 9
+  },
+  {
+    "id": "coastal_maya_remembered_flats",
+    "description": "A member-scoped footwear memory changes Maya's coastal outfit without leaking to other family members.",
+    "event_ids": ["event_coastal_outing"],
+    "purchase_budget": 100,
+    "expected_outfit_count": 3,
+    "expected_guidance_ids": ["guide_coastal_layers"],
+    "required_tools": ["search_wardrobe", "search_memories", "get_weather", "search_style_guidance", "search_sample_catalog"],
+    "max_tool_calls": 9,
+    "remembered_preferences": {
+      "member_maya": ["Maya prefers flats when an event involves extensive walking"]
+    },
+    "expected_memory_item_ids": {
+      "member_maya": ["maya_shoe_01"]
+    }
   }
 ]

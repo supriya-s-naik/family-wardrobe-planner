@@ -37,6 +37,25 @@ class LocalPlanningAgent:
                     "reason": f"Retrieve available owned items for {member['name']}.",
                 }
 
+        if not any(result["name"] == "search_memories" for result in results):
+            event_context = ", ".join(
+                f"{event['name']} {event['dress_code']} {event['setting']} "
+                + " ".join(event["activities"])
+                for event in context["events"]
+            )
+            return {
+                "name": "search_memories",
+                "arguments": {
+                    "member_ids": [member["id"] for member in context["members"]],
+                    "query": (
+                        "Relevant clothing, footwear, color, comfort, cultural, and outfit "
+                        f"repeat preferences for: {event_context}"
+                    ),
+                    "limit_per_member": 5,
+                },
+                "reason": "Recall durable preferences for each participating family member.",
+            }
+
         searched_weather = {
             result["arguments"]["weather_key"]
             for result in results
@@ -84,6 +103,7 @@ class LocalPlanningAgent:
         excluded_ids = self._excluded_item_ids(state.get("validation_errors", []))
         preferred_ids = set(state["request"].get("preferred_item_ids", []))
         required_ids = set(state["request"].get("required_item_ids", []))
+        memories_by_member = self._memories_by_member(state["tool_results"])
 
         outfits: list[OutfitSelection] = []
         purchases: list[PurchaseRecommendation] = []
@@ -93,6 +113,7 @@ class LocalPlanningAgent:
             snapshot = weather[event.weather_key]
             for member in members:
                 items = [item for item in wardrobe[member.id] if item.id not in excluded_ids]
+                member_memories = memories_by_member.get(member.id, [])
                 required_item = next((item for item in items if item.id in required_ids), None)
                 preferred_item = next((item for item in items if item.id in preferred_ids), None)
                 preferred_is_suitable = False
@@ -104,7 +125,12 @@ class LocalPlanningAgent:
                 featured_item = required_item or (
                     preferred_item if preferred_is_suitable else None
                 )
-                selected = self._select_owned_items(items, event, featured_item)
+                selected = self._select_owned_items(
+                    items,
+                    event,
+                    featured_item,
+                    remembered_preferences=[memory["text"] for memory in member_memories],
+                )
                 rationale_parts = [
                     f"Uses {len(selected)} available owned items for {event.dress_code.replace('_', ' ')} conditions."
                 ]
@@ -123,6 +149,9 @@ class LocalPlanningAgent:
                             f"Considered {preferred_item.name} but skipped it because "
                             f"{preference_reason}."
                         )
+                if member_memories:
+                    recalled = "; ".join(memory["text"] for memory in member_memories[:2])
+                    rationale_parts.append(f"Applies remembered preference: {recalled}.")
 
                 if (
                     event.setting in {"outdoor", "mixed"}
@@ -224,6 +253,15 @@ class LocalPlanningAgent:
         return []
 
     @staticmethod
+    def _memories_by_member(
+        results: list[dict[str, Any]],
+    ) -> dict[str, list[dict[str, Any]]]:
+        for result in results:
+            if result["name"] == "search_memories":
+                return result["result"].get("memories_by_member", {})
+        return {}
+
+    @staticmethod
     def _excluded_item_ids(errors: list[str]) -> set[str]:
         return {
             token
@@ -237,6 +275,7 @@ class LocalPlanningAgent:
         items: list[WardrobeItem],
         event: Event,
         featured_item: WardrobeItem | None = None,
+        remembered_preferences: list[str] | None = None,
     ) -> list[WardrobeItem]:
         def first(category: str, formalities: tuple[str, ...]) -> WardrobeItem | None:
             for formality in formalities:
@@ -272,8 +311,13 @@ class LocalPlanningAgent:
                 for category in ("top", "bottom"):
                     add(first(category, priorities))
 
+        remembered_footwear = LocalPlanningAgent._remembered_footwear(
+            items, remembered_preferences or []
+        )
         if featured_item is not None and featured_item.category == "footwear":
             add(featured_item)
+        elif remembered_footwear is not None:
+            add(remembered_footwear)
         else:
             add(first("footwear", priorities))
 
@@ -296,6 +340,32 @@ class LocalPlanningAgent:
             add(featured_item)
 
         return selected
+
+    @staticmethod
+    def _remembered_footwear(
+        items: list[WardrobeItem], remembered_preferences: list[str]
+    ) -> WardrobeItem | None:
+        combined = " ".join(remembered_preferences).lower()
+        keywords = []
+        if "flat" in combined:
+            keywords.append("flat")
+        if "sneaker" in combined or "trainer" in combined:
+            keywords.extend(["sneaker", "trainer"])
+        if "loafer" in combined:
+            keywords.append("loafer")
+        if "boot" in combined:
+            keywords.append("boot")
+        if not keywords:
+            return None
+        return next(
+            (
+                item
+                for item in items
+                if item.category == "footwear"
+                and any(keyword in item.name.lower() for keyword in keywords)
+            ),
+            None,
+        )
 
     @staticmethod
     def _preferred_item_fit(

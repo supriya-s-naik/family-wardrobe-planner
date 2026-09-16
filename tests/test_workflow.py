@@ -20,12 +20,13 @@ def test_demo_workflow_produces_a_valid_multi_event_plan() -> None:
     assert result["status"] == "valid"
     assert result["validation_errors"] == []
     assert len(result["outfits"]) == 9
-    assert result["workflow_metrics"]["tool_calls"] <= 8
+    assert result["workflow_metrics"]["tool_calls"] <= 9
     assert {trace["tool"] for trace in state["tool_trace"]} >= {
         "search_wardrobe",
         "get_weather",
         "search_style_guidance",
         "search_sample_catalog",
+        "search_memories",
     }
 
 
@@ -118,6 +119,52 @@ def test_local_planner_honors_required_wardrobe_item() -> None:
     assert "required wardrobe item" in maya_outfit["rationale"]
 
 
+def test_memory_search_is_member_scoped_and_changes_local_footwear() -> None:
+    dataset = load_seed_dataset(SEED_DIR)
+    dataset.demo_request.event_ids = ["event_coastal_outing"]
+    searched_member_ids = []
+
+    def search_memory(member_id: str, query: str, limit: int):
+        searched_member_ids.append(member_id)
+        assert "Santa Cruz Coastal Outing" in query
+        assert limit == 5
+        if member_id == "member_maya":
+            return [
+                {
+                    "id": "memory_maya_flats",
+                    "member_id": member_id,
+                    "text": "Maya prefers flats when an event involves extensive walking",
+                    "category": "footwear",
+                    "provider": "mem0",
+                }
+            ]
+        return []
+
+    graph = build_planning_graph(
+        dataset,
+        memory_search=search_memory,
+    )
+    state = graph.invoke({"request": dataset.demo_request.model_dump(mode="json")})
+    maya_outfit = next(
+        outfit
+        for outfit in state["final_result"]["outfits"]
+        if outfit["member_id"] == "member_maya"
+    )
+
+    assert set(searched_member_ids) == {
+        "member_maya",
+        "member_arjun",
+        "member_anaya",
+    }
+    assert "maya_shoe_01" in maya_outfit["item_ids"]
+    assert "Applies remembered preference" in maya_outfit["rationale"]
+    memory_result = next(
+        result for result in state["tool_results"] if result["name"] == "search_memories"
+    )["result"]
+    assert memory_result["memories_by_member"]["member_arjun"] == []
+    assert memory_result["retrieval_metadata"]["provider"] == "mem0"
+
+
 def test_nebius_agent_backend_drives_the_same_graph_contract() -> None:
     dataset = load_seed_dataset(SEED_DIR)
     local_state = run_demo_workflow(dataset)
@@ -136,6 +183,7 @@ def test_nebius_agent_backend_drives_the_same_graph_contract() -> None:
 
     assert state["final_result"]["status"] == "valid"
     assert state["final_result"]["workflow_metrics"]["agent_backend"] == "nebius"
-    assert state["final_result"]["workflow_metrics"]["tool_calls"] == 1
+    assert state["final_result"]["workflow_metrics"]["tool_calls"] == 2
     assert state["tool_trace"][0]["tool"] == "prepare_planning_context"
     assert state["tool_trace"][0]["actor"] == "workflow"
+    assert state["tool_trace"][1]["tool"] == "search_memories"

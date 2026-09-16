@@ -13,6 +13,7 @@ The repository currently contains the product requirements, architecture, a runn
 - [Architecture infographic](docs/assets/wardrobe-planner-architecture-user-flow-v2.png)
 - [Nebius model spike](docs/MODEL_SPIKE.md)
 - [Multimodal wardrobe intake](docs/MULTIMODAL_INTAKE.md)
+- [Durable preference memory](docs/MEMORY.md)
 - [Evaluation approach](docs/EVALUATION.md)
 - [Latest evaluation results](evals/results/latest.md)
 - [LangSmith evaluation evidence](evals/results/langsmith.md)
@@ -34,6 +35,7 @@ uv run python scripts/validate_seed.py
 uv run python scripts/index_guidance.py
 uv run python scripts/smoke_test_nebius.py
 uv run python scripts/smoke_test_vision.py path\to\garment.jpg
+uv run python scripts/smoke_test_mem0.py
 uv run --offline python scripts/run_evals.py
 uv run --offline python scripts/run_langsmith_evals.py
 uv run --offline python scripts/run_model_judge.py --case coastal_standard
@@ -54,6 +56,10 @@ and the uploaded photo appears on the new item card. Each wardrobe card also off
 Theme settings live in
 `.streamlit/config.toml` and layout styles in `assets/app.css`.
 
+In **Family**, users can explicitly save, inspect, and delete durable member preferences through
+Mem0. Planning retrieves them with a visible, member-scoped `search_memories` tool call. Retrieved
+memories guide personalization but do not override current instructions or validated constraints.
+
 The Nebius smoke test makes two small live calls: one tool-selection check and one strict structured-output check. It never prints the API key. The evaluation command runs 12 deterministic regression cases and writes machine-readable and Markdown reports under `evals/results/`.
 
 ## Project structure
@@ -65,14 +71,17 @@ docs/                          PRD, architecture, and presentation assets
 scripts/validate_seed.py       Fast deterministic seed check
 scripts/run_evals.py           Local and Nebius evaluation runner
 scripts/run_langsmith_evals.py Hosted LangSmith dataset and experiment runner
+scripts/smoke_test_mem0.py     Reversible live memory round-trip check
 evals/                         Versioned cases, human rubric, and results
 src/wardrobe_planner/
+  adapters/mem0_memory.py      Member-scoped durable preference adapter
   adapters/local.py            Credential-free local adapters
   data/seed_loader.py          Seed loading and reference validation
   domain/models.py             Pydantic domain contracts
   workflow/                    LangGraph, tools, planner, and validator
 tests/test_seed_data.py        Seed and adapter regression checks
 tests/test_evaluation.py       Evaluation-suite regression check
+tests/test_memory.py           Mem0 scoping and normalization checks
 ```
 
 ## Planned integrations
