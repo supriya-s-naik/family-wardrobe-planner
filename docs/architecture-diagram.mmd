@@ -9,13 +9,16 @@ flowchart LR
             CONTEXT[2. Gather planning context]
             PLAN[3. Outfit planning agent]
             VALIDATE[4. Deterministic validator]
-            REPAIR[5. Repair invalid plan]
-            PRESENT[6. Rank and present plan]
+            REPAIR[5. Agent repairs invalid plan]
+            POLICY[6. Bounded weather policy repair]
+            PRESENT[7. Rank and present plan]
 
             INTAKE --> CONTEXT --> PLAN --> VALIDATE
             VALIDATE -->|Valid| PRESENT
+            VALIDATE -->|Only affordable rain gaps| POLICY --> VALIDATE
             VALIDATE -->|Errors and retries remain| REPAIR --> PLAN
-            VALIDATE -->|Retry limit reached| PRESENT
+            VALIDATE -->|Rain gap remains after retries| POLICY
+            VALIDATE -->|Other errors at retry limit| PRESENT
         end
 
         TOOLS[Typed tool layer]
@@ -30,7 +33,7 @@ flowchart LR
     end
 
     subgraph DATA[Authoritative and contextual data]
-        SQLITE[(SQLite<br/>wardrobe, events, photos)]
+        SQLITE[(SQLite<br/>wardrobe, events, photos, saved plans)]
         WEATHER[Weather adapter<br/>live or seeded]
         CATALOG[Curated sample catalog]
         DOCS[Reviewed guidance documents]

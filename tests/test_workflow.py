@@ -104,6 +104,33 @@ def test_validator_rejects_missing_required_wardrobe_item() -> None:
     assert any("Required wardrobe item maya_top_03 missing" in error for error in errors)
 
 
+def test_validator_requires_affordable_rain_protection_for_each_participant() -> None:
+    dataset = load_seed_dataset(SEED_DIR)
+    dataset.demo_request.event_ids = ["event_coastal_outing"]
+    state = run_demo_workflow(dataset)
+    result = deepcopy(state["final_result"])
+    result.pop("validation_errors")
+    result.pop("workflow_metrics")
+    result["purchases"] = [
+        purchase
+        for purchase in result["purchases"]
+        if purchase["member_id"] != "member_maya"
+    ]
+    result["total_purchase_cost"] = 38
+
+    errors = validate_plan(
+        OutfitPlan.model_validate(result),
+        dataset,
+        dataset.demo_request.event_ids,
+    )
+
+    assert any(
+        "Missing rain protection for event_coastal_outing/member_maya" in error
+        and "catalog_01" in error
+        for error in errors
+    )
+
+
 def test_local_planner_honors_required_wardrobe_item() -> None:
     dataset = load_seed_dataset(SEED_DIR)
     dataset.demo_request.event_ids = ["event_coastal_outing"]
@@ -195,3 +222,46 @@ def test_nebius_agent_backend_drives_the_same_graph_contract() -> None:
     assert "maya_outer_02" not in prompt_payload["allowed_wardrobe_ids_by_member"]["member_maya"]
     assert "maya_outer_01" in prompt_payload["allowed_wardrobe_ids_by_member"]["member_maya"]
     assert "opaque identifiers" in captured["system_prompt"]
+
+
+def test_workflow_repairs_an_unambiguous_weather_gap_without_another_model_call() -> None:
+    dataset = load_seed_dataset(SEED_DIR)
+    dataset.demo_request.event_ids = ["event_coastal_outing"]
+    local_state = run_demo_workflow(dataset)
+    incomplete_plan = deepcopy(local_state["final_result"])
+    incomplete_plan.pop("validation_errors")
+    incomplete_plan.pop("workflow_metrics")
+    incomplete_plan["status"] = "needs_review"
+    incomplete_plan["purchases"] = [
+        purchase
+        for purchase in incomplete_plan["purchases"]
+        if purchase["member_id"] != "member_maya"
+    ]
+    incomplete_plan["total_purchase_cost"] = 38
+
+    class IncompleteNebiusModel:
+        calls = 0
+
+        def generate_via_tool(self, **kwargs: object):
+            self.calls += 1
+            return OutfitPlan.model_validate(incomplete_plan)
+
+    model = IncompleteNebiusModel()
+    graph = build_planning_graph(dataset, NebiusPlanningAgent(model))
+    state = graph.invoke({"request": dataset.demo_request.model_dump(mode="json")})
+    result = state["final_result"]
+
+    assert result["status"] == "valid"
+    assert result["validation_errors"] == []
+    assert result["total_purchase_cost"] == 96
+    assert any(
+        purchase["member_id"] == "member_maya"
+        and purchase["catalog_item_id"] == "catalog_01"
+        and purchase["supports_event_ids"] == ["event_coastal_outing"]
+        for purchase in result["purchases"]
+    )
+    assert model.calls == 1
+    assert result["workflow_metrics"]["repair_attempts"] == 0
+    assert result["workflow_metrics"]["policy_repairs"] == 1
+    assert state["tool_trace"][-1]["tool"] == "apply_weather_policy_repair"
+    assert state["tool_trace"][-1]["actor"] == "workflow"

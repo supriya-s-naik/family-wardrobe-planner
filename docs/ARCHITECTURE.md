@@ -41,7 +41,7 @@ flowchart LR
     end
 
     subgraph DATA[Authoritative and contextual data]
-        SQLITE[(SQLite<br/>wardrobe, events, photos)]
+        SQLITE[(SQLite<br/>wardrobe, events, photos, saved plans)]
         WEATHER[Weather adapter<br/>live or seeded]
         CATALOG[Curated sample catalog]
         DOCS[Reviewed guidance documents]
@@ -74,7 +74,7 @@ flowchart LR
 
 ## Architectural intent
 
-The application uses a hybrid workflow. LangGraph controls the required sequence, gathers authoritative context through the typed `prepare_planning_context` tool, validates the result, and enforces termination conditions. The Nebius model has bounded autonomy inside the planning stage: it chooses the outfit combinations, explains them, decides whether catalog purchases add value, and submits the complete result through the typed `submit_outfit_plan` tool. A live run therefore needs one provider request for each planning or repair attempt instead of one request per data lookup.
+The application uses a hybrid workflow. LangGraph controls the required sequence, gathers authoritative context through the typed `prepare_planning_context` tool, validates the result, and enforces termination conditions. The Nebius model has bounded autonomy inside the planning stage: it chooses the outfit combinations, explains them, decides whether catalog purchases add value, and submits the complete result through the typed `submit_outfit_plan` tool. A live run therefore needs one provider request for each planning or repair attempt instead of one request per data lookup. When every validation failure is an affordable rain-protection gap, a narrow workflow policy adds the applicable catalog item immediately, records that action, and validates the plan again. Other errors retain the bounded model-repair loop.
 
 The model never becomes the source of truth for inventory, availability, events, or budget.
 Inventory, availability, and events come from SQLite-backed application state; household profiles,
@@ -95,7 +95,7 @@ creates an authoritative wardrobe item.
 | Nebius model | Contextual reasoning, outfit generation, purchase decisions, explanations, typed plan submission | Deciding whether hard constraints passed |
 | Nebius vision model | Suggesting editable wardrobe metadata from one uploaded item photo | Saving inventory without user review |
 | Typed tool layer | Stable boundary between the agent and application services | Free-form database access by the model |
-| SQLite | Persistent wardrobe, uploaded photos, availability, events, and event weather | Semantic style guidance |
+| SQLite | Persistent wardrobe, uploaded photos, availability, events, event weather, and validated plans | Semantic style guidance |
 | Pinecone | Semantic retrieval of reviewed styling and dress-code guidance | Inventory, prices, or member ownership |
 | Mem0 | Member-scoped preferences learned across conversations | Events, wardrobe availability, or current hard constraints |
 | Validator | Schema, ownership, availability, coverage, explicit preference, and budget checks | Subjective style judgments |
@@ -130,12 +130,20 @@ sequenceDiagram
 
     alt Candidate is valid
         Rules-->>Graph: Pass
+    else Only affordable rain gaps remain
+        Rules-->>Graph: Specific rain-protection violations
+        Graph->>Graph: Apply catalog-backed weather policy repair
+        Graph->>Rules: Validate again
     else Repairable errors and retries remain
         Rules-->>Graph: Specific violations
         Graph->>Model: Repair using validation feedback
         Model-->>Graph: Revised candidate
         Graph->>Rules: Validate again
-    else No valid plan after retry limit
+    else Rain gap remains with other errors after retry limit
+        Rules-->>Graph: Specific rain-protection violation
+        Graph->>Graph: Apply catalog-backed weather policy repair
+        Graph->>Rules: Validate again
+    else Other errors remain after retry limit
         Rules-->>Graph: Unresolved constraint report
     end
 
@@ -166,6 +174,8 @@ PlanningState
 ├── candidate_plan
 ├── validation_errors[]
 ├── retry_count
+├── policy_repair_attempted
+├── policy_repairs[]
 ├── tool_call_count
 └── final_result
 ```
@@ -182,6 +192,7 @@ Large wardrobe or guidance collections are not copied into every model message. 
 | `execute_tool` | Approved tool request | Typed planning context | Deterministic execution |
 | `validate` | Candidate plan and authoritative records | Validation errors or pass | Deterministic rules |
 | `repair` | Candidate and validation errors | Repair instructions for planner | Deterministic routing; model performs repair |
+| `policy_repair` | Candidate with an unresolved affordable rain gap | Catalog-backed rain purchase and trace record | Deterministic workflow policy |
 | `finalize` | Valid plan or terminal failure | Ranked, display-ready response | Mostly deterministic formatting |
 | `save_plan` | User-selected valid plan | Persisted plan ID | Deterministic write after user action |
 
@@ -190,9 +201,12 @@ Large wardrobe or guidance collections are not copied into every model message. 
 - Maximum application tool calls per run: 9; the live path uses one aggregate context call plus
   one member-scoped memory retrieval call.
 - Maximum validation repair attempts: 2.
+- The workflow may immediately repair only affordable, age-compatible rain-protection gaps using
+  retrieved catalog items; when other errors are present, model repair keeps precedence.
 - A plan cannot be marked valid unless all hard checks pass.
 - A tool error is returned as structured state; the model does not receive stack traces or secrets.
-- When the retry limit is reached, the workflow returns the exact unresolved constraints.
+- When neither the model nor the narrow workflow policy can produce a valid plan, the workflow
+  returns the exact unresolved constraints.
 
 These values are prototype defaults and should be configurable.
 

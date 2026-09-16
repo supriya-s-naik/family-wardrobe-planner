@@ -12,6 +12,8 @@ class PlanningState(TypedDict, total=False):
     candidate_plan: dict[str, Any] | None
     validation_errors: list[str]
     retry_count: int
+    policy_repair_attempted: bool
+    policy_repairs: list[dict[str, Any]]
     tool_call_count: int
     terminal_error: str | None
     final_result: dict[str, Any] | None

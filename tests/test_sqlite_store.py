@@ -3,6 +3,7 @@ from pathlib import Path
 from wardrobe_planner.adapters.sqlite_store import SQLiteApplicationStore
 from wardrobe_planner.data.seed_loader import load_seed_dataset
 from wardrobe_planner.domain.models import Event, WardrobeItem, WeatherSnapshot
+from wardrobe_planner.workflow.graph import run_demo_workflow
 
 SEED_DIR = Path(__file__).resolve().parents[1] / "data" / "seed"
 
@@ -96,3 +97,46 @@ def test_added_event_and_weather_survive_a_new_store_instance(tmp_path):
 
     assert next(row for row in restarted_dataset.events if row.id == event.id) == event
     assert next(row for row in restarted_dataset.weather if row.key == weather.key) == weather
+
+
+def test_saved_plan_survives_restart_and_can_be_found_by_item(tmp_path):
+    store, seed = initialized_store(tmp_path)
+    seed.demo_request.event_ids = ["event_coastal_outing"]
+    planning_state = run_demo_workflow(seed)
+
+    saved_plan = store.save_plan(seed.household.id, planning_state)
+    restarted_store = SQLiteApplicationStore(store.database_path)
+    restarted_store.initialize(seed)
+
+    loaded_plan = restarted_store.get_saved_plan(saved_plan.id)
+    saved_plans = restarted_store.list_saved_plans(seed.household.id)
+    affected_plan = restarted_store.find_latest_plan_using_item(
+        seed.household.id, "maya_shoe_02"
+    )
+
+    assert loaded_plan is not None
+    assert loaded_plan.event_ids == ["event_coastal_outing"]
+    assert loaded_plan.planning_state["final_result"]["status"] == "valid"
+    assert saved_plans[0].id == saved_plan.id
+    assert affected_plan is not None
+    assert affected_plan.id == saved_plan.id
+
+
+def test_saved_plan_can_be_deleted_without_deleting_its_replan(tmp_path):
+    store, seed = initialized_store(tmp_path)
+    seed.demo_request.event_ids = ["event_coastal_outing"]
+    planning_state = run_demo_workflow(seed)
+    original = store.save_plan(seed.household.id, planning_state)
+    replan = store.save_plan(
+        seed.household.id,
+        planning_state,
+        source_plan_id=original.id,
+    )
+
+    assert store.delete_saved_plan(seed.household.id, original.id) is True
+
+    assert store.get_saved_plan(original.id) is None
+    remaining_replan = store.get_saved_plan(replan.id)
+    assert remaining_replan is not None
+    assert remaining_replan.source_plan_id is None
+    assert store.delete_saved_plan(seed.household.id, original.id) is False

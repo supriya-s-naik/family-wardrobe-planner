@@ -1,3 +1,4 @@
+import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
@@ -16,7 +17,7 @@ from wardrobe_planner.domain.models import Event, WardrobeItem, WeatherSnapshot
 from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workflow
 
 ROOT = Path(__file__).resolve().parent
-APP_STATE_VERSION = "sqlite-persistence-v11"
+APP_STATE_VERSION = "saved-plans-replanning-v12"
 st.set_page_config(
     page_title="Everyday / together · Wardrobe Planner", page_icon="🌿", layout="wide"
 )
@@ -56,6 +57,7 @@ st.session_state.setdefault("wardrobe_image_analysis_cache", {})
 member_by_id = {m.id: m for m in dataset.family_members}
 event_by_id = {e.id: e for e in dataset.events}
 item_by_id = {i.id: i for i in dataset.wardrobe_items}
+weather_by_key = {snapshot.key: snapshot for snapshot in dataset.weather}
 COLORS = {
     "teal": "#477d78",
     "navy": "#35415b",
@@ -125,6 +127,96 @@ def style_item(item_id):
 def clear_style_item():
     st.session_state.pop("style_item_id", None)
     st.session_state.pop("style_item_mode", None)
+
+
+def open_saved_plan(plan_id):
+    saved_plan = application_store.get_saved_plan(plan_id)
+    if saved_plan is None:
+        st.session_state["events_notice"] = "That saved plan is no longer available."
+        return
+    state = saved_plan.planning_state
+    request = state.get("request") or {}
+    required_item_ids = request.get("required_item_ids", [])
+    preferred_item_ids = request.get("preferred_item_ids", [])
+    styled_item_ids = required_item_ids or preferred_item_ids
+    if styled_item_ids:
+        st.session_state["style_item_id"] = styled_item_ids[0]
+        st.session_state["style_item_mode"] = (
+            "Must use" if required_item_ids else "Use if suitable"
+        )
+    else:
+        clear_style_item()
+    state["app_state_version"] = APP_STATE_VERSION
+    state["saved_plan_id"] = saved_plan.id
+    st.session_state["selected_events"] = saved_plan.event_ids
+    st.session_state["purchase_budget"] = saved_plan.purchase_budget
+    st.session_state["planning_state"] = state
+    source_plan = (
+        application_store.get_saved_plan(saved_plan.source_plan_id)
+        if saved_plan.source_plan_id
+        else None
+    )
+    if source_plan:
+        st.session_state["replan_source_plan_id"] = source_plan.id
+        st.session_state["replan_source_state"] = source_plan.planning_state
+    else:
+        st.session_state.pop("replan_source_plan_id", None)
+        st.session_state.pop("replan_source_state", None)
+    st.session_state["page"] = "Plan outfits"
+
+
+def start_replan(plan_id):
+    saved_plan = application_store.get_saved_plan(plan_id)
+    if saved_plan is None:
+        st.session_state["events_notice"] = "That saved plan is no longer available."
+        return
+    request = saved_plan.planning_state.get("request") or {}
+    required_item_ids = request.get("required_item_ids", [])
+    preferred_item_ids = request.get("preferred_item_ids", [])
+    requested_item_ids = required_item_ids or preferred_item_ids
+    requested_item = item_by_id.get(requested_item_ids[0]) if requested_item_ids else None
+    if requested_item is not None and requested_item.available:
+        st.session_state["style_item_id"] = requested_item.id
+        st.session_state["style_item_mode"] = (
+            "Must use" if required_item_ids else "Use if suitable"
+        )
+    else:
+        clear_style_item()
+    st.session_state["selected_events"] = saved_plan.event_ids
+    st.session_state["purchase_budget"] = saved_plan.purchase_budget
+    st.session_state["replan_source_plan_id"] = saved_plan.id
+    st.session_state["replan_source_state"] = saved_plan.planning_state
+    st.session_state.pop("planning_state", None)
+    st.session_state.pop("affected_saved_plan_id", None)
+    st.session_state["page"] = "Plan outfits"
+
+
+def cancel_replan():
+    st.session_state.pop("replan_source_plan_id", None)
+    st.session_state.pop("replan_source_state", None)
+
+
+def request_saved_plan_deletion(plan_id):
+    st.session_state["pending_delete_plan_id"] = plan_id
+
+
+def cancel_saved_plan_deletion():
+    st.session_state.pop("pending_delete_plan_id", None)
+
+
+def delete_saved_plan(plan_id):
+    deleted = application_store.delete_saved_plan(dataset.household.id, plan_id)
+    planning_state = st.session_state.get("planning_state")
+    if planning_state and planning_state.get("saved_plan_id") == plan_id:
+        planning_state.pop("saved_plan_id", None)
+    if st.session_state.get("replan_source_plan_id") == plan_id:
+        cancel_replan()
+    if st.session_state.get("affected_saved_plan_id") == plan_id:
+        st.session_state.pop("affected_saved_plan_id", None)
+    st.session_state.pop("pending_delete_plan_id", None)
+    st.session_state["events_notice"] = (
+        "Saved plan deleted." if deleted else "That saved plan was already removed."
+    )
 
 
 WARDROBE_FORM_KEYS = (
@@ -482,6 +574,102 @@ def memory_manager():
                         st.error("Mem0 couldn’t delete this preference. Please try again.")
 
 
+def render_replan_comparison(previous_state, current_state):
+    previous_result = previous_state.get("final_result") or {}
+    current_result = current_state.get("final_result") or {}
+    previous_outfits = {
+        (outfit["event_id"], outfit["member_id"]): outfit
+        for outfit in previous_result.get("outfits", [])
+    }
+    current_outfits = {
+        (outfit["event_id"], outfit["member_id"]): outfit
+        for outfit in current_result.get("outfits", [])
+    }
+    previous_purchases = {
+        (purchase["member_id"], purchase["catalog_item_id"]): purchase
+        for purchase in previous_result.get("purchases", [])
+    }
+    current_purchases = {
+        (purchase["member_id"], purchase["catalog_item_id"]): purchase
+        for purchase in current_result.get("purchases", [])
+    }
+    removed_purchase_keys = sorted(set(previous_purchases) - set(current_purchases))
+    added_purchase_keys = sorted(set(current_purchases) - set(previous_purchases))
+    changed = []
+    preserved = 0
+    for key in sorted(set(previous_outfits) | set(current_outfits)):
+        before_ids = set(previous_outfits.get(key, {}).get("item_ids", []))
+        after_ids = set(current_outfits.get(key, {}).get("item_ids", []))
+        if before_ids == after_ids:
+            preserved += 1
+            continue
+        changed.append(
+            {
+                "event_id": key[0],
+                "member_id": key[1],
+                "removed": sorted(before_ids - after_ids),
+                "added": sorted(after_ids - before_ids),
+            }
+        )
+
+    st.subheader("What changed in this replan")
+    changed_metric, preserved_metric, cost_metric = st.columns(3)
+    changed_metric.metric("Outfits changed", len(changed))
+    preserved_metric.metric("Outfits preserved", preserved)
+    previous_cost = float(previous_result.get("total_purchase_cost", 0))
+    current_cost = float(current_result.get("total_purchase_cost", 0))
+    cost_metric.metric(
+        "Suggested purchases",
+        f"${current_cost:.0f}",
+        delta=f"${current_cost - previous_cost:+.0f} from saved plan",
+    )
+    if not changed and not removed_purchase_keys and not added_purchase_keys:
+        st.success("Every outfit and shopping suggestion from the saved plan was preserved.")
+        return
+
+    for change in changed:
+        event = event_by_id.get(change["event_id"])
+        member = member_by_id.get(change["member_id"])
+        with st.container(border=True):
+            st.markdown(
+                f"**{member.name if member else change['member_id']} · "
+                f"{event.name if event else change['event_id']}**"
+            )
+            removed_names = [
+                item_by_id[item_id].name if item_id in item_by_id else item_id
+                for item_id in change["removed"]
+            ]
+            added_names = [
+                item_by_id[item_id].name if item_id in item_by_id else item_id
+                for item_id in change["added"]
+            ]
+            if removed_names:
+                st.write("**Removed:** " + ", ".join(removed_names))
+            if added_names:
+                st.write("**Added:** " + ", ".join(added_names))
+    if removed_purchase_keys or added_purchase_keys:
+        catalog_by_id = {product.id: product for product in dataset.catalog_items}
+        st.markdown("**Shopping changes**")
+        for member_id, catalog_item_id in removed_purchase_keys:
+            product = catalog_by_id.get(catalog_item_id)
+            member = member_by_id.get(member_id)
+            product_label = product.name if product else catalog_item_id
+            price_label = f" · ${product.price:.0f}" if product else ""
+            st.write(
+                f"**Removed suggestion:** {product_label} for "
+                f"{member.name if member else member_id}{price_label}"
+            )
+        for member_id, catalog_item_id in added_purchase_keys:
+            product = catalog_by_id.get(catalog_item_id)
+            member = member_by_id.get(member_id)
+            product_label = product.name if product else catalog_item_id
+            price_label = f" · ${product.price:.0f}" if product else ""
+            st.write(
+                f"**Added suggestion:** {product_label} for "
+                f"{member.name if member else member_id}{price_label}"
+            )
+
+
 def render_results(state):
     result = state["final_result"]
     preferred_item_ids = set(state["request"].get("preferred_item_ids", []))
@@ -495,6 +683,9 @@ def render_results(state):
         st.error(result.get("error", "This plan needs review before you use it."))
         for error in result.get("validation_errors", []):
             st.write(error)
+    replan_source_state = st.session_state.get("replan_source_state")
+    if replan_source_state:
+        render_replan_comparison(replan_source_state, state)
     for event_id in state["request"]["event_ids"]:
         outfits = [o for o in result.get("outfits", []) if o["event_id"] == event_id]
         if not outfits:
@@ -529,6 +720,27 @@ def render_results(state):
                     f"**{product.name}** for {member_by_id[purchase['member_id']].name} · ${product.price:.0f}"
                 )
                 st.caption(purchase["rationale"])
+    if result["status"] == "valid":
+        if saved_notice := st.session_state.pop("saved_plan_notice", None):
+            st.success(saved_notice)
+        saved_plan_id = state.get("saved_plan_id")
+        if st.button(
+            "Plan saved" if saved_plan_id else "Save family plan",
+            key="save_current_plan",
+            disabled=bool(saved_plan_id),
+            type="primary" if not saved_plan_id else "secondary",
+        ):
+            saved_plan = application_store.save_plan(
+                dataset.household.id,
+                state,
+                source_plan_id=st.session_state.get("replan_source_plan_id"),
+            )
+            state["saved_plan_id"] = saved_plan.id
+            st.session_state["planning_state"] = state
+            st.session_state["saved_plan_notice"] = (
+                "Plan saved. You can reopen or replan it from Events."
+            )
+            st.rerun()
     with st.expander("Planning details"):
         st.json(result.get("workflow_metrics", {}))
         for trace in state.get("tool_trace", []):
@@ -674,6 +886,27 @@ elif page == "Wardrobe":
             add_wardrobe_item_dialog()
     if wardrobe_notice := st.session_state.pop("wardrobe_notice", None):
         st.success(wardrobe_notice)
+    affected_saved_plan_id = st.session_state.get("affected_saved_plan_id")
+    if affected_saved_plan_id:
+        affected_plan = application_store.get_saved_plan(affected_saved_plan_id)
+        if affected_plan:
+            affected_events = [
+                event_by_id[event_id].name
+                for event_id in affected_plan.event_ids
+                if event_id in event_by_id
+            ]
+            st.warning(
+                "This availability change affects the saved plan for "
+                + ", ".join(affected_events)
+                + "."
+            )
+            st.button(
+                "Review and replan →",
+                key="replan_affected_plan",
+                on_click=start_replan,
+                args=(affected_plan.id,),
+                type="primary",
+            )
     owner, category = st.columns(2)
     with owner:
         selected_member = st.selectbox(
@@ -704,7 +937,7 @@ elif page == "Wardrobe":
             with column, st.container(border=True):
                 uploaded_image = application_store.get_wardrobe_image(item.id)
                 if uploaded_image:
-                    st.image(uploaded_image, caption=item.name, use_container_width=True)
+                    st.image(uploaded_image, caption=item.name, width="stretch")
                 else:
                     st.html(illustration(item.category, item.color, item.name))
                 st.markdown(f"**{item.name}**")
@@ -735,6 +968,14 @@ elif page == "Wardrobe":
                         updated_item = application_store.set_wardrobe_item_availability(
                             item.id, not item.available
                         )
+                        if not updated_item.available:
+                            affected_plan = application_store.find_latest_plan_using_item(
+                                dataset.household.id, item.id
+                            )
+                            if affected_plan:
+                                st.session_state["affected_saved_plan_id"] = affected_plan.id
+                        else:
+                            st.session_state.pop("affected_saved_plan_id", None)
                         if not updated_item.available and st.session_state.get(
                             "style_item_id"
                         ) == item.id:
@@ -770,6 +1011,14 @@ elif page == "Events":
                     + ", ".join(member_by_id[mid].name for mid in event.participant_ids)
                 )
                 st.caption(" · ".join(event.activities).capitalize())
+                weather = weather_by_key.get(event.weather_key)
+                if weather:
+                    st.caption(
+                        f"Weather: {weather.condition.title()} · "
+                        f"{weather.low_f}–{weather.high_f}°F · "
+                        f"{weather.precipitation_probability}% chance of rain · "
+                        f"{weather.source.title()}"
+                    )
             with action:
                 st.button(
                     "Plan this event →",
@@ -777,11 +1026,99 @@ elif page == "Events":
                     on_click=navigate,
                     args=("Plan outfits", event.id),
                 )
+    saved_plans = application_store.list_saved_plans(dataset.household.id)
+    if saved_plans:
+        st.subheader("Saved family plans")
+        st.caption("Open a previous result or use it as the baseline for replanning.")
+        for saved_plan in saved_plans:
+            saved_result = saved_plan.planning_state.get("final_result") or {}
+            saved_event_names = [
+                event_by_id[event_id].name
+                for event_id in saved_plan.event_ids
+                if event_id in event_by_id
+            ]
+            with st.container(border=True):
+                details, open_action, replan_action, delete_action = st.columns(
+                    [3, 1, 1, 1], vertical_alignment="center"
+                )
+                with details:
+                    st.markdown("**" + ", ".join(saved_event_names) + "**")
+                    st.caption(
+                        f"Saved {saved_plan.created_at.astimezone():%b %d, %Y at %I:%M %p} · "
+                        f"${saved_result.get('total_purchase_cost', 0):.0f} in suggestions"
+                    )
+                with open_action:
+                    st.button(
+                        "Open",
+                        key=f"open_saved_{saved_plan.id}",
+                        on_click=open_saved_plan,
+                        args=(saved_plan.id,),
+                    )
+                with replan_action:
+                    st.button(
+                        "Replan",
+                        key=f"replan_saved_{saved_plan.id}",
+                        on_click=start_replan,
+                        args=(saved_plan.id,),
+                        type="primary",
+                    )
+                with delete_action:
+                    st.button(
+                        "Delete",
+                        key=f"delete_saved_{saved_plan.id}",
+                        on_click=request_saved_plan_deletion,
+                        args=(saved_plan.id,),
+                    )
+                if st.session_state.get("pending_delete_plan_id") == saved_plan.id:
+                    st.warning(
+                        "Delete this saved plan? Its generated outfits will be removed permanently."
+                    )
+                    confirm_delete, keep_plan = st.columns([1, 4])
+                    with confirm_delete:
+                        st.button(
+                            "Confirm delete",
+                            key=f"confirm_delete_saved_{saved_plan.id}",
+                            on_click=delete_saved_plan,
+                            args=(saved_plan.id,),
+                            type="primary",
+                        )
+                    with keep_plan:
+                        st.button(
+                            "Keep plan",
+                            key=f"cancel_delete_saved_{saved_plan.id}",
+                            on_click=cancel_saved_plan_deletion,
+                        )
 else:
     st.title("Let’s make getting dressed easier.")
     st.write(
         "Choose your occasions. We’ll start with your wardrobe and highlight any missing pieces."
     )
+    replan_source_plan_id = st.session_state.get("replan_source_plan_id")
+    replan_source_state = st.session_state.get("replan_source_state")
+    if replan_source_plan_id and replan_source_state:
+        previous_item_ids = {
+            item_id
+            for outfit in (replan_source_state.get("final_result") or {}).get("outfits", [])
+            for item_id in outfit.get("item_ids", [])
+        }
+        unavailable_names = [
+            item_by_id[item_id].name
+            for item_id in previous_item_ids
+            if item_id in item_by_id and not item_by_id[item_id].available
+        ]
+        with st.container(border=True):
+            replan_details, replan_action = st.columns([4, 1], vertical_alignment="center")
+            with replan_details:
+                st.markdown("**Replanning from a saved family plan**")
+                if unavailable_names:
+                    st.write("Needs replacement: " + ", ".join(unavailable_names))
+                else:
+                    st.write(
+                        "The previous plan is the comparison baseline. Valid outfits should stay "
+                        "stable where possible."
+                    )
+            with replan_action:
+                st.button("Cancel replan", key="cancel_replan", on_click=cancel_replan)
     styled_item_id = st.session_state.get("style_item_id")
     styled_item = item_by_id.get(styled_item_id)
     if styled_item_id and styled_item is None:
@@ -831,12 +1168,15 @@ else:
             f"Choose an event attended by {member_by_id[styled_item.member_id].name} "
             f"to style {styled_item.name}."
         )
+    st.session_state.setdefault(
+        "purchase_budget", float(dataset.demo_request.purchase_budget)
+    )
     budget = st.number_input(
         "Maximum budget for new items ($)",
         min_value=0.0,
         max_value=float(dataset.household.planning_budget),
-        value=float(dataset.demo_request.purchase_budget),
         step=5.0,
+        key="purchase_budget",
     )
     with st.expander("Planning options"):
         backend = st.radio(
@@ -855,7 +1195,7 @@ else:
     active_job = st.session_state.get("planning_job")
     job_running = active_job is not None and not active_job.done()
     if st.button(
-        "Generate family plan",
+        "Replan family outfits" if replan_source_state else "Generate family plan",
         type="primary",
         disabled=not selected_events or job_running or not style_item_applies,
         key="generate_plan",
@@ -882,11 +1222,29 @@ else:
                     f"{member_by_id[styled_item.member_id].name} when it suits the event and "
                     "conditions; otherwise explain why it was skipped."
                 )
+        replan_instruction = ""
+        if replan_source_state:
+            previous_outfits = [
+                {
+                    "event_id": outfit["event_id"],
+                    "member_id": outfit["member_id"],
+                    "item_ids": outfit["item_ids"],
+                }
+                for outfit in (replan_source_state.get("final_result") or {}).get(
+                    "outfits", []
+                )
+            ]
+            replan_instruction = (
+                " This is a replan of a saved result. Replace unavailable or invalid items and "
+                "preserve every previous outfit that remains valid where possible. Previous "
+                f"outfits: {json.dumps(previous_outfits)}."
+            )
         request_dataset.demo_request.user_message = (
             "Plan outfits for "
             + ", ".join(event_by_id[eid].name for eid in selected_events)
             + f". Use owned items first, coordinate without identical outfits, and keep all suggested purchases within ${budget:.0f} total."
             + item_instruction
+            + replan_instruction
         )
         if backend == "Nebius live":
             runner = run_nebius_workflow

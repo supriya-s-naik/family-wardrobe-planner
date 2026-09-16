@@ -11,6 +11,9 @@ The database currently persists:
 - Wardrobe availability changes.
 - Seeded and user-added events.
 - Seeded weather attached to events.
+- Validated family plans, including their request, result, evidence, and workflow metrics.
+- Saved plans can be deleted from Events after confirmation; replans remain available and are
+  detached from a deleted comparison baseline.
 
 Version-controlled JSON remains the bootstrap source for the fictional household, member
 profiles, sample catalog, guidance, and initial demo request. Database initialization inserts
@@ -23,7 +26,8 @@ new seed records without overwriting local edits, so it is safe to run on every 
 3. Add an event.
 4. Stop Streamlit completely and start it again.
 5. Confirm the item, photo, availability state, and event remain present.
-6. Generate a plan and confirm the unavailable item is absent.
-
-Generated-plan persistence is a separate follow-up. Until that is added, a completed plan remains
-in the current Streamlit session only.
+6. Generate a valid plan and choose **Save family plan**.
+7. Open **Events** and confirm the plan appears under **Saved family plans**.
+8. Mark one of its wardrobe items unavailable and choose **Review and replan**.
+9. Generate the replacement and confirm the comparison lists changed and preserved outfits.
+10. Restart Streamlit and reopen the saved plan from **Events**.

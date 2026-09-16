@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import Counter
 
 from wardrobe_planner.domain.models import SeedDataset
-from wardrobe_planner.domain.plans import OutfitPlan
+from wardrobe_planner.domain.plans import OutfitPlan, PurchaseRecommendation
 
 
 def validate_plan(
@@ -18,6 +18,7 @@ def validate_plan(
     events = {event.id: event for event in dataset.events if event.id in set(event_ids)}
     members = {member.id: member for member in dataset.family_members}
     catalog = {item.id: item for item in dataset.catalog_items}
+    weather_by_key = {snapshot.key: snapshot for snapshot in dataset.weather}
 
     expected_pairs = {
         (event.id, member_id) for event in events.values() for member_id in event.participant_ids
@@ -128,7 +129,149 @@ def validate_plan(
     budget = dataset.demo_request.purchase_budget
     if purchase_total > budget:
         errors.append(f"Purchase budget exceeded: {purchase_total:.2f} > {budget:.2f}")
+
+    for outfit in plan.outfits:
+        event = events.get(outfit.event_id)
+        member = members.get(outfit.member_id)
+        if event is None or member is None or event.setting not in {"outdoor", "mixed"}:
+            continue
+        weather = weather_by_key.get(event.weather_key)
+        if weather is None or weather.precipitation_probability < 40:
+            continue
+        has_owned_rain_protection = any(
+            item_id in items and "rain" in items[item_id].occasion_tags
+            for item_id in outfit.item_ids
+        )
+        has_purchased_rain_protection = any(
+            purchase.member_id == outfit.member_id
+            and event.id in purchase.supports_event_ids
+            and purchase.catalog_item_id in catalog
+            and "rain" in catalog[purchase.catalog_item_id].occasion_tags
+            for purchase in plan.purchases
+        )
+        if has_owned_rain_protection or has_purchased_rain_protection:
+            continue
+        affordable_rain_products = sorted(
+            (
+                product
+                for product in catalog.values()
+                if "rain" in product.occasion_tags
+                and product.intended_age_group in {member.age_group, "any"}
+                and purchase_total + product.price <= budget
+            ),
+            key=lambda product: product.price,
+        )
+        if affordable_rain_products:
+            product = affordable_rain_products[0]
+            errors.append(
+                f"Missing rain protection for {event.id}/{outfit.member_id}: add an owned "
+                f"rain-tagged item or purchase {product.id} ({product.price:.2f}) for this event"
+            )
     if plan.household_id != dataset.household.id:
         errors.append(f"Wrong household ID: {plan.household_id}")
 
     return errors
+
+
+def repair_affordable_weather_gaps(
+    plan: OutfitPlan,
+    dataset: SeedDataset,
+    event_ids: list[str],
+) -> tuple[OutfitPlan, list[dict[str, object]]]:
+    """Apply only unambiguous, catalog-backed rain-protection repairs.
+
+    The agent still gets the first two repair attempts. This workflow fallback is intentionally
+    narrow: it can reuse or add an age-compatible rain product when the event requires it and the
+    purchase stays within budget. All other validation failures remain for human review.
+    """
+
+    repaired = plan.model_copy(deep=True)
+    items = {item.id: item for item in dataset.wardrobe_items}
+    events = {event.id: event for event in dataset.events if event.id in set(event_ids)}
+    members = {member.id: member for member in dataset.family_members}
+    catalog = {item.id: item for item in dataset.catalog_items}
+    weather_by_key = {snapshot.key: snapshot for snapshot in dataset.weather}
+    budget = dataset.demo_request.purchase_budget
+    purchase_total = sum(
+        catalog[purchase.catalog_item_id].price
+        for purchase in repaired.purchases
+        if purchase.catalog_item_id in catalog
+    )
+    repairs: list[dict[str, object]] = []
+
+    for outfit in repaired.outfits:
+        event = events.get(outfit.event_id)
+        member = members.get(outfit.member_id)
+        if event is None or member is None or event.setting not in {"outdoor", "mixed"}:
+            continue
+        weather = weather_by_key.get(event.weather_key)
+        if weather is None or weather.precipitation_probability < 40:
+            continue
+        if any(
+            item_id in items and "rain" in items[item_id].occasion_tags
+            for item_id in outfit.item_ids
+        ):
+            continue
+
+        existing_purchase = next(
+            (
+                purchase
+                for purchase in repaired.purchases
+                if purchase.member_id == outfit.member_id
+                and purchase.catalog_item_id in catalog
+                and "rain" in catalog[purchase.catalog_item_id].occasion_tags
+            ),
+            None,
+        )
+        if existing_purchase is not None:
+            if event.id not in existing_purchase.supports_event_ids:
+                existing_purchase.supports_event_ids.append(event.id)
+                repairs.append(
+                    {
+                        "event_id": event.id,
+                        "member_id": outfit.member_id,
+                        "catalog_item_id": existing_purchase.catalog_item_id,
+                        "action": "reuse_purchase",
+                        "added_cost": 0.0,
+                    }
+                )
+            continue
+
+        affordable_products = sorted(
+            (
+                product
+                for product in catalog.values()
+                if "rain" in product.occasion_tags
+                and product.intended_age_group in {member.age_group, "any"}
+                and purchase_total + product.price <= budget
+            ),
+            key=lambda product: (product.price, product.id),
+        )
+        if not affordable_products:
+            continue
+
+        product = affordable_products[0]
+        repaired.purchases.append(
+            PurchaseRecommendation(
+                catalog_item_id=product.id,
+                member_id=outfit.member_id,
+                supports_event_ids=[event.id],
+                rationale=(
+                    f"Workflow policy added {product.name} after validation found missing rain "
+                    "protection for this outdoor event."
+                ),
+            )
+        )
+        purchase_total += product.price
+        repairs.append(
+            {
+                "event_id": event.id,
+                "member_id": outfit.member_id,
+                "catalog_item_id": product.id,
+                "action": "add_purchase",
+                "added_cost": product.price,
+            }
+        )
+
+    repaired.total_purchase_cost = round(purchase_total, 2)
+    return repaired, repairs

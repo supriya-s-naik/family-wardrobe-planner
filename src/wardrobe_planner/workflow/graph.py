@@ -17,7 +17,7 @@ from wardrobe_planner.workflow.local_agent import LocalPlanningAgent
 from wardrobe_planner.workflow.nebius_agent import NebiusPlanningAgent
 from wardrobe_planner.workflow.state import PlanningState
 from wardrobe_planner.workflow.tools import ToolExecutor
-from wardrobe_planner.workflow.validator import validate_plan
+from wardrobe_planner.workflow.validator import repair_affordable_weather_gaps, validate_plan
 
 MAX_TOOL_CALLS = 9
 MAX_REPAIR_ATTEMPTS = 2
@@ -54,6 +54,8 @@ def build_planning_graph(
             "tool_trace": [],
             "validation_errors": [],
             "retry_count": 0,
+            "policy_repair_attempted": False,
+            "policy_repairs": [],
             "tool_call_count": 0,
             "terminal_error": None,
             "candidate_plan": None,
@@ -170,6 +172,41 @@ def build_planning_graph(
             "retry_count": state.get("retry_count", 0) + 1,
         }
 
+    def policy_repair_node(state: PlanningState) -> dict[str, Any]:
+        candidate = state.get("candidate_plan")
+        if candidate is None:
+            return {"policy_repair_attempted": True}
+        repaired_plan, repairs = repair_affordable_weather_gaps(
+            OutfitPlan.model_validate(candidate),
+            dataset,
+            state["request"]["event_ids"],
+        )
+        if not repairs:
+            return {"policy_repair_attempted": True}
+        repair_reason = (
+            "The validator found only unambiguous rain-protection gaps, so the workflow applied "
+            "the affordable catalog-backed requirement without another model call."
+            if state.get("retry_count", 0) < MAX_REPAIR_ATTEMPTS
+            else "The agent exhausted its bounded repair attempts, so the workflow applied an "
+            "affordable catalog-backed rain-protection requirement."
+        )
+        trace_record = {
+            "step": state.get("tool_call_count", 0) + 1,
+            "tool": "apply_weather_policy_repair",
+            "reason": repair_reason,
+            "actor": "workflow",
+            "arguments": {"repairs": repairs},
+            "result_count": len(repairs),
+            "batch_size": 1,
+        }
+        return {
+            "candidate_plan": repaired_plan.model_dump(mode="json"),
+            "policy_repair_attempted": True,
+            "policy_repairs": repairs,
+            "tool_trace": [*state.get("tool_trace", []), trace_record],
+            "tool_call_count": state.get("tool_call_count", 0) + 1,
+        }
+
     def finalize_node(state: PlanningState) -> dict[str, Any]:
         if state.get("terminal_error"):
             return {
@@ -199,6 +236,7 @@ def build_planning_graph(
             "agent_backend": planning_agent.backend_name,
             "tool_calls": state.get("tool_call_count", 0),
             "repair_attempts": state.get("retry_count", 0),
+            "policy_repairs": len(state.get("policy_repairs", [])),
         }
         return {"final_result": result}
 
@@ -209,9 +247,24 @@ def build_planning_graph(
             return "execute_tool"
         return "validate"
 
-    def route_after_validation(state: PlanningState) -> Literal["repair", "finalize"]:
-        if state.get("validation_errors") and state.get("retry_count", 0) < MAX_REPAIR_ATTEMPTS:
+    def route_after_validation(
+        state: PlanningState,
+    ) -> Literal["repair", "policy_repair", "finalize"]:
+        errors = state.get("validation_errors", [])
+        rain_errors = [
+            error for error in errors if error.startswith("Missing rain protection for ")
+        ]
+        if errors and len(rain_errors) == len(errors) and not state.get(
+            "policy_repair_attempted", False
+        ):
+            return "policy_repair"
+        if errors and state.get("retry_count", 0) < MAX_REPAIR_ATTEMPTS:
             return "repair"
+        if (
+            not state.get("policy_repair_attempted", False)
+            and rain_errors
+        ):
+            return "policy_repair"
         return "finalize"
 
     graph = StateGraph(PlanningState)
@@ -220,6 +273,7 @@ def build_planning_graph(
     graph.add_node("execute_tool", execute_tool)
     graph.add_node("validate", validate_node)
     graph.add_node("repair", repair_node)
+    graph.add_node("policy_repair", policy_repair_node)
     graph.add_node("finalize", finalize_node)
     graph.add_edge(START, "load_context")
     graph.add_edge("load_context", "agent")
@@ -227,6 +281,7 @@ def build_planning_graph(
     graph.add_edge("execute_tool", "agent")
     graph.add_conditional_edges("validate", route_after_validation)
     graph.add_edge("repair", "agent")
+    graph.add_edge("policy_repair", "validate")
     graph.add_edge("finalize", END)
     return graph.compile()
 

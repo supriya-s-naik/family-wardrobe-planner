@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Literal
+from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -29,8 +30,17 @@ class OutfitPlan(BaseModel):
     summary: str
 
 
+class SavedPlan(BaseModel):
+    id: str
+    household_id: str
+    event_ids: list[str] = Field(min_length=1)
+    purchase_budget: float = Field(ge=0)
+    planning_state: dict[str, Any]
+    created_at: datetime
+    source_plan_id: str | None = None
+
+
 class ToolSmokeResult(BaseModel):
     expected_tool: str
     actual_tool: str
     arguments: dict[str, object]
-

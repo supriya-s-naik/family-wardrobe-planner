@@ -53,7 +53,9 @@ uses category/color illustrations. In **Wardrobe**, an uploaded item photo can b
 by the Nebius Gemma vision model; the resulting metadata remains editable before saving,
 and the uploaded photo appears on the new item card after an application restart. Wardrobe
 items, uploaded photos, events, availability changes, and event weather are stored in a local
-SQLite database. Each wardrobe card also offers
+SQLite database. Valid plans can be saved, reopened, and used as a replanning baseline. When an
+item from a saved plan becomes unavailable, the app identifies the affected plan and shows what
+the new plan changed or preserved. Each wardrobe card also offers
 **Style this item**: **Use if suitable** treats the garment as a preference, while
 **Must use** makes its inclusion a validator-enforced requirement for the selected events.
 Theme settings live in
@@ -100,4 +102,4 @@ Exact inventory, ownership, availability, events, budget, and saved plans remain
 
 ## Workflow implemented
 
-The interface offers two backends. **Nebius live** is the primary path: LangGraph gathers the authoritative planning context through one aggregate typed tool, retrieves semantically relevant reviewed guidance from Pinecone, then makes one Nebius request in which the model builds and submits the complete plan through the typed `submit_outfit_plan` tool. Planning details display the retrieval query, provider, relevance scores, sources, and passages. If Pinecone is unavailable, the run is visibly labeled as a local-keyword fallback. **Demo-safe local** follows the same graph and validation rules without network access and retains the granular tool trace for demonstration. Both paths validate ownership, availability, coverage, preferences, purchase references, and budget, and permit at most two repair attempts.
+The interface offers two backends. **Nebius live** is the primary path: LangGraph gathers the authoritative planning context through one aggregate typed tool, retrieves semantically relevant reviewed guidance from Pinecone, then makes one Nebius request in which the model builds and submits the complete plan through the typed `submit_outfit_plan` tool. Planning details display the retrieval query, provider, relevance scores, sources, and passages. If Pinecone is unavailable, the run is visibly labeled as a local-keyword fallback. **Demo-safe local** follows the same graph and validation rules without network access and retains the granular tool trace for demonstration. Both paths validate ownership, availability, coverage, preferences, purchase references, weather readiness, and budget. The workflow can immediately fix a plan whose only failures are affordable catalog-backed rain-protection gaps, recording each action before validating again. Other model errors get at most two repair attempts.

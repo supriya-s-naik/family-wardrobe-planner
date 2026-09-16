@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 from wardrobe_planner.data.seed_loader import validate_references
 from wardrobe_planner.domain.models import Event, SeedDataset, WardrobeItem, WeatherSnapshot
+from wardrobe_planner.domain.plans import SavedPlan
 
 
 class SQLiteApplicationStore:
@@ -56,6 +60,19 @@ class SQLiteApplicationStore:
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
+
+                CREATE TABLE IF NOT EXISTS saved_plans (
+                    id TEXT PRIMARY KEY,
+                    household_id TEXT NOT NULL,
+                    event_ids_json TEXT NOT NULL,
+                    purchase_budget REAL NOT NULL,
+                    planning_state_json TEXT NOT NULL,
+                    source_plan_id TEXT,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS saved_plans_household_created_idx
+                ON saved_plans(household_id, created_at DESC);
                 """
             )
             connection.executemany(
@@ -221,6 +238,120 @@ class SQLiteApplicationStore:
                     event.model_dump_json(),
                 ),
             )
+
+    def save_plan(
+        self,
+        household_id: str,
+        planning_state: dict,
+        *,
+        source_plan_id: str | None = None,
+    ) -> SavedPlan:
+        request = planning_state.get("request") or {}
+        result = planning_state.get("final_result") or {}
+        if result.get("status") != "valid":
+            raise ValueError("Only valid plans can be saved")
+        if request.get("household_id") != household_id:
+            raise ValueError("Plan household does not match the application household")
+        event_ids = list(request.get("event_ids") or [])
+        if not event_ids:
+            raise ValueError("A saved plan must contain at least one event")
+
+        saved_plan = SavedPlan(
+            id=f"plan_{uuid4().hex[:12]}",
+            household_id=household_id,
+            event_ids=event_ids,
+            purchase_budget=float(request.get("purchase_budget", 0)),
+            planning_state=json.loads(json.dumps(planning_state, default=str)),
+            created_at=datetime.now(UTC),
+            source_plan_id=source_plan_id,
+        )
+        with self._connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO saved_plans (
+                    id,
+                    household_id,
+                    event_ids_json,
+                    purchase_budget,
+                    planning_state_json,
+                    source_plan_id,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    saved_plan.id,
+                    saved_plan.household_id,
+                    json.dumps(saved_plan.event_ids),
+                    saved_plan.purchase_budget,
+                    json.dumps(saved_plan.planning_state),
+                    saved_plan.source_plan_id,
+                    saved_plan.created_at.isoformat(),
+                ),
+            )
+        return saved_plan
+
+    def get_saved_plan(self, plan_id: str) -> SavedPlan | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM saved_plans WHERE id = ?", (plan_id,)
+            ).fetchone()
+        return self._saved_plan_from_row(row) if row else None
+
+    def list_saved_plans(self, household_id: str, limit: int = 10) -> list[SavedPlan]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM saved_plans
+                WHERE household_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (household_id, limit),
+            ).fetchall()
+        return [self._saved_plan_from_row(row) for row in rows]
+
+    def delete_saved_plan(self, household_id: str, plan_id: str) -> bool:
+        """Delete one household plan and detach any replans that used it as a baseline."""
+
+        with self._connection() as connection:
+            cursor = connection.execute(
+                "DELETE FROM saved_plans WHERE id = ? AND household_id = ?",
+                (plan_id, household_id),
+            )
+            if cursor.rowcount:
+                connection.execute(
+                    """
+                    UPDATE saved_plans
+                    SET source_plan_id = NULL
+                    WHERE household_id = ? AND source_plan_id = ?
+                    """,
+                    (household_id, plan_id),
+                )
+        return bool(cursor.rowcount)
+
+    def find_latest_plan_using_item(
+        self, household_id: str, item_id: str
+    ) -> SavedPlan | None:
+        for saved_plan in self.list_saved_plans(household_id, limit=50):
+            result = saved_plan.planning_state.get("final_result") or {}
+            if any(
+                item_id in outfit.get("item_ids", [])
+                for outfit in result.get("outfits", [])
+            ):
+                return saved_plan
+        return None
+
+    @staticmethod
+    def _saved_plan_from_row(row: sqlite3.Row) -> SavedPlan:
+        return SavedPlan(
+            id=row["id"],
+            household_id=row["household_id"],
+            event_ids=json.loads(row["event_ids_json"]),
+            purchase_budget=row["purchase_budget"],
+            planning_state=json.loads(row["planning_state_json"]),
+            source_plan_id=row["source_plan_id"],
+            created_at=row["created_at"],
+        )
 
     @contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:

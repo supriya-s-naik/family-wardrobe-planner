@@ -145,6 +145,81 @@ def test_wardrobe_availability_change_survives_app_restart_and_affects_planning(
     assert "maya_shoe_02" not in selected_item_ids
 
 
+def test_saved_plan_drives_visible_replanning_flow():
+    app = start()
+    app.radio(key="page").set_value("Plan outfits").run()
+    app.multiselect(key="selected_events").set_value(["event_coastal_outing"]).run()
+    app.radio[1].set_value("Demo-safe local").run()
+    app.button(key="generate_plan").click().run(timeout=15)
+    app = await_plan(app)
+
+    app.button(key="save_current_plan").click().run()
+    saved_plan_id = app.session_state["planning_state"]["saved_plan_id"]
+    assert app.button(key="save_current_plan").disabled
+
+    app.radio(key="page").set_value("Wardrobe").run()
+    app.selectbox(key="owner").select("member_maya").run()
+    app.selectbox[1].select("footwear").run()
+    app.button(key="availability_maya_shoe_02").click().run()
+
+    assert "affects the saved plan" in app.warning[0].value
+    app.button(key="replan_affected_plan").click().run()
+    assert app.session_state["replan_source_plan_id"] == saved_plan_id
+    assert app.button(key="generate_plan").label == "Replan family outfits"
+
+    app.radio[1].set_value("Demo-safe local").run()
+    app.button(key="generate_plan").click().run(timeout=15)
+    app = await_plan(app)
+
+    result = app.session_state["planning_state"]["final_result"]
+    selected_item_ids = {
+        item_id for outfit in result["outfits"] for item_id in outfit["item_ids"]
+    }
+    assert result["status"] == "valid"
+    assert "maya_shoe_02" not in selected_item_ids
+    assert any("What changed in this replan" in heading.value for heading in app.subheader)
+    assert any("Removed:" in block.value for block in app.markdown)
+    assert any("Added:" in block.value for block in app.markdown)
+
+    app.button(key="save_current_plan").click().run()
+    replanned_saved_plan_id = app.session_state["planning_state"]["saved_plan_id"]
+
+    restarted_app = start()
+    restarted_app.radio(key="page").set_value("Events").run()
+    assert restarted_app.button(key=f"open_saved_{saved_plan_id}")
+    assert restarted_app.button(key=f"replan_saved_{saved_plan_id}")
+    restarted_app.button(key=f"open_saved_{replanned_saved_plan_id}").click().run()
+    assert restarted_app.session_state["page"] == "Plan outfits"
+    assert restarted_app.session_state["replan_source_plan_id"] == saved_plan_id
+    assert restarted_app.button(key="save_current_plan").disabled
+    assert any(
+        "What changed in this replan" in heading.value
+        for heading in restarted_app.subheader
+    )
+
+
+def test_saved_plan_deletion_requires_confirmation():
+    app = start()
+    app.radio(key="page").set_value("Plan outfits").run()
+    app.multiselect(key="selected_events").set_value(["event_coastal_outing"]).run()
+    app.radio[1].set_value("Demo-safe local").run()
+    app.button(key="generate_plan").click().run(timeout=15)
+    app = await_plan(app)
+    app.button(key="save_current_plan").click().run()
+    saved_plan_id = app.session_state["planning_state"]["saved_plan_id"]
+
+    app.radio(key="page").set_value("Events").run()
+    app.button(key=f"delete_saved_{saved_plan_id}").click().run()
+
+    assert app.button(key=f"confirm_delete_saved_{saved_plan_id}")
+    assert app.button(key=f"cancel_delete_saved_{saved_plan_id}")
+    app.button(key=f"confirm_delete_saved_{saved_plan_id}").click().run()
+
+    assert not app.exception
+    assert "Saved plan deleted" in app.success[0].value
+    assert all(button.key != f"open_saved_{saved_plan_id}" for button in app.button)
+
+
 def test_family_page_can_save_and_display_member_scoped_memory():
     class FakePreferenceStore:
         def __init__(self):
