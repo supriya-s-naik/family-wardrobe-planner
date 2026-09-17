@@ -19,7 +19,7 @@ from wardrobe_planner.workflow.graph import run_demo_workflow, run_nebius_workfl
 from wardrobe_planner.workflow.refinement import refine_plan
 
 ROOT = Path(__file__).resolve().parent
-APP_STATE_VERSION = "plan-feedback-refinement-v14"
+APP_STATE_VERSION = "event-management-v15"
 st.set_page_config(
     page_title="Everyday / together · Wardrobe Planner", page_icon="🌿", layout="wide"
 )
@@ -64,6 +64,12 @@ member_by_id = {m.id: m for m in dataset.family_members}
 event_by_id = {e.id: e for e in dataset.events}
 item_by_id = {i.id: i for i in dataset.wardrobe_items}
 weather_by_key = {snapshot.key: snapshot for snapshot in dataset.weather}
+if "selected_events" in st.session_state:
+    st.session_state["selected_events"] = [
+        event_id
+        for event_id in st.session_state["selected_events"]
+        if event_id in event_by_id
+    ]
 COLORS = {
     "teal": "#477d78",
     "navy": "#35415b",
@@ -258,6 +264,25 @@ def clear_refinement_context():
         st.session_state.pop(key, None)
 
 
+def state_uses_event(state, event_id):
+    return event_id in ((state or {}).get("request") or {}).get("event_ids", [])
+
+
+def clear_event_dependent_session_state(event_id, *, remove_selection=False):
+    if state_uses_event(st.session_state.get("planning_state"), event_id):
+        st.session_state.pop("planning_state", None)
+    if state_uses_event(st.session_state.get("replan_source_state"), event_id):
+        cancel_replan()
+    clear_refinement_context()
+    st.session_state.pop("affected_saved_plan_id", None)
+    if remove_selection:
+        st.session_state["selected_events"] = [
+            selected_event_id
+            for selected_event_id in st.session_state.get("selected_events", [])
+            if selected_event_id != event_id
+        ]
+
+
 def accept_refinement():
     state = st.session_state.get("planning_state")
     if state and state.get("refinement"):
@@ -293,6 +318,45 @@ def delete_saved_plan(plan_id):
     st.session_state["events_notice"] = (
         "Saved plan deleted." if deleted else "That saved plan was already removed."
     )
+
+
+def request_event_deletion(event_id):
+    st.session_state["pending_delete_event_id"] = event_id
+
+
+def cancel_event_deletion():
+    st.session_state.pop("pending_delete_event_id", None)
+
+
+def delete_event(event_id):
+    event = event_by_id.get(event_id)
+    deleted, deleted_plan_count = application_store.delete_event(
+        dataset.household.id, event_id
+    )
+    clear_event_dependent_session_state(event_id, remove_selection=True)
+    st.session_state.pop("pending_delete_event_id", None)
+    st.session_state.pop("pending_delete_plan_id", None)
+    if deleted:
+        plan_note = (
+            f" {deleted_plan_count} saved plan"
+            f"{'s were' if deleted_plan_count != 1 else ' was'} also deleted because "
+            "it used this event."
+            if deleted_plan_count
+            else ""
+        )
+        st.session_state["events_notice"] = (
+            f"{event.name if event else 'Event'} was deleted.{plan_note}"
+        )
+    else:
+        st.session_state["events_notice"] = "That event was already removed."
+
+
+def request_event_edit(event_id):
+    st.session_state["editing_event_id"] = event_id
+
+
+def cancel_event_edit():
+    st.session_state.pop("editing_event_id", None)
 
 
 WARDROBE_FORM_KEYS = (
@@ -527,6 +591,166 @@ def add_event_dialog():
         )
         application_store.save_event(event, weather)
         st.session_state["events_notice"] = f"{event.name} was added and is ready to plan."
+        st.rerun()
+
+
+@st.dialog("Edit event", on_dismiss=cancel_event_edit)
+def edit_event_dialog(event_id):
+    event = event_by_id.get(event_id)
+    if event is None:
+        st.error("That event is no longer available.")
+        return
+    weather = weather_by_key.get(event.weather_key)
+    if weather is None:
+        st.error("This event has no weather record, so it cannot be edited safely.")
+        return
+
+    st.write("Update the occasion, attendees, or forecast used by the outfit planner.")
+    with st.form(f"edit_event_form_{event.id}"):
+        name = st.text_input(
+            "Event name", value=event.name, key=f"edit_event_name_{event.id}"
+        )
+        event_date, location = st.columns(2)
+        with event_date:
+            date_value = st.date_input(
+                "Date", value=event.date, key=f"edit_event_date_{event.id}"
+            )
+        with location:
+            location_value = st.text_input(
+                "Location", value=event.location, key=f"edit_event_location_{event.id}"
+            )
+        participants = st.multiselect(
+            "Who is attending?",
+            list(member_by_id),
+            default=event.participant_ids,
+            format_func=lambda mid: member_by_id[mid].name,
+            key=f"edit_event_participants_{event.id}",
+        )
+        event_type = st.text_input(
+            "Occasion type", value=event.event_type, key=f"edit_event_type_{event.id}"
+        )
+        dress_code, setting = st.columns(2)
+        dress_codes = ["casual", "smart_casual", "formal", "festive"]
+        settings = ["indoor", "outdoor", "mixed"]
+        with dress_code:
+            dress_code_value = st.selectbox(
+                "Dress code",
+                dress_codes,
+                index=dress_codes.index(event.dress_code),
+                format_func=lambda value: value.replace("_", " ").title(),
+                key=f"edit_event_dress_code_{event.id}",
+            )
+        with setting:
+            setting_value = st.selectbox(
+                "Setting",
+                settings,
+                index=settings.index(event.setting),
+                key=f"edit_event_setting_{event.id}",
+            )
+        activities = st.text_input(
+            "Activities",
+            value=", ".join(event.activities),
+            key=f"edit_event_activities_{event.id}",
+        )
+        notes = st.text_area(
+            "Anything else the planner should know?",
+            value=event.notes or "",
+            height=80,
+            key=f"edit_event_notes_{event.id}",
+        )
+
+        st.markdown("**Weather forecast**")
+        condition = st.text_input(
+            "Conditions",
+            value=weather.condition,
+            key=f"edit_weather_condition_{event.id}",
+        )
+        low_column, high_column = st.columns(2)
+        with low_column:
+            low_f = st.number_input(
+                "Low (°F)",
+                value=weather.low_f,
+                step=1,
+                key=f"edit_weather_low_{event.id}",
+            )
+        with high_column:
+            high_f = st.number_input(
+                "High (°F)",
+                value=weather.high_f,
+                step=1,
+                key=f"edit_weather_high_{event.id}",
+            )
+        rain_column, wind_column = st.columns(2)
+        with rain_column:
+            rain = st.number_input(
+                "Chance of rain (%)",
+                min_value=0,
+                max_value=100,
+                value=weather.precipitation_probability,
+                step=1,
+                key=f"edit_weather_rain_{event.id}",
+            )
+        with wind_column:
+            wind = st.number_input(
+                "Wind (mph)",
+                min_value=0,
+                value=weather.wind_mph,
+                step=1,
+                key=f"edit_weather_wind_{event.id}",
+            )
+        submitted = st.form_submit_button("Save changes", type="primary")
+
+    if submitted:
+        if not name.strip() or not location_value.strip() or not participants:
+            st.error("Keep an event name, location, and at least one family member.")
+            return
+        if not condition.strip():
+            st.error("Add a short weather description.")
+            return
+        if low_f > high_f:
+            st.error("The forecast low cannot be higher than the forecast high.")
+            return
+
+        updated_event = Event(
+            id=event.id,
+            household_id=event.household_id,
+            name=name.strip(),
+            date=date_value,
+            location=location_value.strip(),
+            participant_ids=participants,
+            event_type=event_type.strip() or "family event",
+            dress_code=dress_code_value,
+            setting=setting_value,
+            activities=[
+                activity.strip() for activity in activities.split(",") if activity.strip()
+            ]
+            or ["socializing"],
+            weather_key=event.weather_key,
+            notes=notes.strip() or None,
+        )
+        updated_weather = WeatherSnapshot(
+            key=weather.key,
+            condition=condition.strip(),
+            high_f=int(high_f),
+            low_f=int(low_f),
+            precipitation_probability=int(rain),
+            wind_mph=int(wind),
+            source=weather.source,
+        )
+        affected_plan_count = application_store.count_saved_plans_for_event(
+            dataset.household.id, event.id
+        )
+        application_store.save_event(updated_event, updated_weather)
+        clear_event_dependent_session_state(event.id)
+        st.session_state.pop("editing_event_id", None)
+        plan_note = (
+            f" {affected_plan_count} saved plan"
+            f"{'s still use' if affected_plan_count != 1 else ' still uses'} the previous "
+            "details; choose Replan to update the outfits."
+            if affected_plan_count
+            else ""
+        )
+        st.session_state["events_notice"] = f"{updated_event.name} was updated.{plan_note}"
         st.rerun()
 
 
@@ -1224,9 +1448,18 @@ elif page == "Events":
             sync_calendar_dialog()
     if events_notice := st.session_state.pop("events_notice", None):
         st.success(events_notice)
+    if not dataset.events:
+        st.info("No events yet. Add an occasion to start planning outfits.")
+    planning_job = st.session_state.get("planning_job")
+    refinement_job = st.session_state.get("refinement_job")
+    event_changes_disabled = (
+        planning_job is not None and not planning_job.done()
+    ) or (refinement_job is not None and not refinement_job.done())
     for event in sorted(dataset.events, key=lambda e: e.date):
         with st.container(border=True):
-            details, action = st.columns([3, 1], vertical_alignment="center")
+            details, plan_action, edit_action, delete_action = st.columns(
+                [3, 1, 0.7, 0.8], vertical_alignment="center"
+            )
             with details:
                 st.caption(f"{event.date:%A, %B %d, %Y} · {event.location}")
                 st.subheader(event.name)
@@ -1244,13 +1477,63 @@ elif page == "Events":
                         f"{weather.precipitation_probability}% chance of rain · "
                         f"{weather.source.title()}"
                     )
-            with action:
+            with plan_action:
                 st.button(
                     "Plan this event →",
                     key=f"plan_{event.id}",
                     on_click=navigate,
                     args=("Plan outfits", event.id),
                 )
+            with edit_action:
+                st.button(
+                    "Edit",
+                    key=f"edit_{event.id}",
+                    on_click=request_event_edit,
+                    args=(event.id,),
+                    disabled=event_changes_disabled,
+                )
+            with delete_action:
+                st.button(
+                    "Delete",
+                    key=f"delete_{event.id}",
+                    on_click=request_event_deletion,
+                    args=(event.id,),
+                    disabled=event_changes_disabled,
+                )
+            if st.session_state.get("pending_delete_event_id") == event.id:
+                dependent_plan_count = application_store.count_saved_plans_for_event(
+                    dataset.household.id, event.id
+                )
+                plan_warning = (
+                    f" This will also delete {dependent_plan_count} saved plan"
+                    f"{'s' if dependent_plan_count != 1 else ''} that use this event."
+                    if dependent_plan_count
+                    else ""
+                )
+                st.warning(
+                    f"Delete {event.name}? The event and its weather will be removed permanently."
+                    + plan_warning
+                )
+                confirm_delete, keep_event = st.columns([1, 4])
+                with confirm_delete:
+                    st.button(
+                        "Confirm delete",
+                        key=f"confirm_delete_{event.id}",
+                        on_click=delete_event,
+                        args=(event.id,),
+                        type="primary",
+                    )
+                with keep_event:
+                    st.button(
+                        "Keep event",
+                        key=f"cancel_delete_{event.id}",
+                        on_click=cancel_event_deletion,
+                    )
+    editing_event_id = st.session_state.get("editing_event_id")
+    if editing_event_id in event_by_id:
+        edit_event_dialog(editing_event_id)
+    elif editing_event_id:
+        st.session_state.pop("editing_event_id", None)
     saved_plans = application_store.list_saved_plans(dataset.household.id)
     if saved_plans:
         st.subheader("Saved family plans")

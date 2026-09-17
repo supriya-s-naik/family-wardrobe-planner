@@ -73,6 +73,11 @@ class SQLiteApplicationStore:
 
                 CREATE INDEX IF NOT EXISTS saved_plans_household_created_idx
                 ON saved_plans(household_id, created_at DESC);
+
+                CREATE TABLE IF NOT EXISTS deleted_events (
+                    event_id TEXT PRIMARY KEY,
+                    deleted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
                 """
             )
             connection.executemany(
@@ -113,6 +118,17 @@ class SQLiteApplicationStore:
                     for position, event in enumerate(seed.events)
                 ],
             )
+            # Seed rows are inserted on every startup. Keep an explicit tombstone so a user-deleted
+            # seeded event does not silently return, then remove its now-unreferenced weather row.
+            connection.execute(
+                "DELETE FROM events WHERE id IN (SELECT event_id FROM deleted_events)"
+            )
+            connection.execute(
+                """
+                DELETE FROM weather_snapshots
+                WHERE key NOT IN (SELECT DISTINCT weather_key FROM events)
+                """
+            )
 
     def load_dataset(self, seed: SeedDataset) -> SeedDataset:
         dataset = seed.model_copy(deep=True)
@@ -143,6 +159,16 @@ class SQLiteApplicationStore:
         dataset.weather = [
             WeatherSnapshot.model_validate_json(row["payload_json"]) for row in weather_rows
         ]
+        available_event_ids = {event.id for event in dataset.events}
+        dataset.demo_request = dataset.demo_request.model_copy(
+            update={
+                "event_ids": [
+                    event_id
+                    for event_id in dataset.demo_request.event_ids
+                    if event_id in available_event_ids
+                ]
+            }
+        )
         validate_references(dataset)
         return dataset
 
@@ -238,6 +264,75 @@ class SQLiteApplicationStore:
                     event.model_dump_json(),
                 ),
             )
+            connection.execute("DELETE FROM deleted_events WHERE event_id = ?", (event.id,))
+
+    def count_saved_plans_for_event(self, household_id: str, event_id: str) -> int:
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT event_ids_json FROM saved_plans
+                WHERE household_id = ?
+                """,
+                (household_id,),
+            ).fetchall()
+        return sum(event_id in json.loads(row["event_ids_json"]) for row in rows)
+
+    def delete_event(self, household_id: str, event_id: str) -> tuple[bool, int]:
+        """Delete an event, its dependent plans, and weather that no other event uses."""
+
+        with self._connection() as connection:
+            event_row = connection.execute(
+                """
+                SELECT weather_key FROM events
+                WHERE id = ? AND household_id = ?
+                """,
+                (event_id, household_id),
+            ).fetchone()
+            if event_row is None:
+                return False, 0
+
+            plan_rows = connection.execute(
+                """
+                SELECT id, event_ids_json FROM saved_plans
+                WHERE household_id = ?
+                """,
+                (household_id,),
+            ).fetchall()
+            dependent_plan_ids = [
+                row["id"]
+                for row in plan_rows
+                if event_id in json.loads(row["event_ids_json"])
+            ]
+            for plan_id in dependent_plan_ids:
+                connection.execute("DELETE FROM saved_plans WHERE id = ?", (plan_id,))
+            if dependent_plan_ids:
+                connection.executemany(
+                    "UPDATE saved_plans SET source_plan_id = NULL WHERE source_plan_id = ?",
+                    [(plan_id,) for plan_id in dependent_plan_ids],
+                )
+
+            connection.execute(
+                "DELETE FROM events WHERE id = ? AND household_id = ?",
+                (event_id, household_id),
+            )
+            connection.execute(
+                """
+                INSERT INTO deleted_events (event_id)
+                VALUES (?)
+                ON CONFLICT(event_id) DO UPDATE SET deleted_at = CURRENT_TIMESTAMP
+                """,
+                (event_id,),
+            )
+            connection.execute(
+                """
+                DELETE FROM weather_snapshots
+                WHERE key = ? AND NOT EXISTS (
+                    SELECT 1 FROM events WHERE weather_key = ?
+                )
+                """,
+                (event_row["weather_key"], event_row["weather_key"]),
+            )
+        return True, len(dependent_plan_ids)
 
     def save_plan(
         self,

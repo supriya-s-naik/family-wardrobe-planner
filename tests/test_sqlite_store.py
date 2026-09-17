@@ -99,6 +99,66 @@ def test_added_event_and_weather_survive_a_new_store_instance(tmp_path):
     assert next(row for row in restarted_dataset.weather if row.key == weather.key) == weather
 
 
+def test_event_attendees_and_weather_edits_survive_restart(tmp_path):
+    store, seed = initialized_store(tmp_path)
+    original_event = next(event for event in seed.events if event.id == "event_coastal_outing")
+    original_weather = next(
+        weather for weather in seed.weather if weather.key == original_event.weather_key
+    )
+    updated_event = original_event.model_copy(
+        update={
+            "participant_ids": ["member_maya", "member_arjun"],
+            "notes": "Anaya is staying home.",
+        }
+    )
+    updated_weather = original_weather.model_copy(
+        update={
+            "condition": "warm and sunny",
+            "high_f": 74,
+            "low_f": 58,
+            "precipitation_probability": 0,
+            "wind_mph": 6,
+        }
+    )
+
+    store.save_event(updated_event, updated_weather)
+    restarted_store = SQLiteApplicationStore(store.database_path)
+    restarted_store.initialize(seed)
+    restarted_dataset = restarted_store.load_dataset(seed)
+
+    persisted_event = next(
+        event for event in restarted_dataset.events if event.id == original_event.id
+    )
+    persisted_weather = next(
+        weather for weather in restarted_dataset.weather if weather.key == original_weather.key
+    )
+    assert persisted_event.participant_ids == ["member_maya", "member_arjun"]
+    assert persisted_event.notes == "Anaya is staying home."
+    assert persisted_weather.condition == "warm and sunny"
+    assert persisted_weather.high_f == 74
+    assert persisted_weather.precipitation_probability == 0
+
+
+def test_deleted_seed_event_stays_deleted_and_removes_dependent_plans(tmp_path):
+    store, seed = initialized_store(tmp_path)
+    seed.demo_request.event_ids = ["event_coastal_outing"]
+    planning_state = run_demo_workflow(seed)
+    saved_plan = store.save_plan(seed.household.id, planning_state)
+
+    assert store.count_saved_plans_for_event(seed.household.id, "event_coastal_outing") == 1
+    assert store.delete_event(seed.household.id, "event_coastal_outing") == (True, 1)
+
+    restarted_store = SQLiteApplicationStore(store.database_path)
+    restarted_store.initialize(seed)
+    restarted_dataset = restarted_store.load_dataset(seed)
+
+    assert all(event.id != "event_coastal_outing" for event in restarted_dataset.events)
+    assert all(weather.key != "weather_outing" for weather in restarted_dataset.weather)
+    assert restarted_dataset.demo_request.event_ids == []
+    assert restarted_store.get_saved_plan(saved_plan.id) is None
+    assert restarted_store.delete_event(seed.household.id, "event_coastal_outing") == (False, 0)
+
+
 def test_saved_plan_survives_restart_and_can_be_found_by_item(tmp_path):
     store, seed = initialized_store(tmp_path)
     seed.demo_request.event_ids = ["event_coastal_outing"]

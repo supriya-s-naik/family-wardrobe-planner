@@ -55,7 +55,9 @@ uses category/color illustrations. In **Wardrobe**, an uploaded item photo can b
 by the Nebius Gemma vision model; the resulting metadata remains editable before saving,
 and the uploaded photo appears on the new item card after an application restart. Wardrobe
 items, uploaded photos, events, availability changes, and event weather are stored in a local
-SQLite database. Valid plans can be saved, reopened, and used as a replanning baseline. When an
+SQLite database. Events can be edited when attendees or forecasts change; the next plan uses the
+updated details. Event deletion requires confirmation and also removes saved plans that reference
+the deleted occasion. Valid plans can be saved, reopened, and used as a replanning baseline. When an
 item from a saved plan becomes unavailable, the app identifies the affected plan and shows what
 the new plan changed or preserved. A valid result also includes **Refine this plan**, where a user
 can request a scoped change such as replacing denim jeans with shorts. Nebius or the local fallback

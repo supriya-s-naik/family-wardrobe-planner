@@ -11,6 +11,9 @@ The database currently persists:
 - Wardrobe availability changes.
 - Seeded and user-added events.
 - Seeded weather attached to events.
+- Event edits, including attendees and weather changes.
+- Event deletion tombstones, which prevent deleted seed events from returning on restart. Deleting
+  an event also deletes saved plans that reference it and removes weather no other event uses.
 - Validated family plans, including their request, result, evidence, and workflow metrics.
 - Saved plans can be deleted from Events after confirmation; replans remain available and are
   detached from a deleted comparison baseline.
@@ -25,11 +28,12 @@ new seed records without overwriting local edits, so it is safe to run on every 
 
 1. Start the app and add a wardrobe item with a photo.
 2. Mark one seeded item unavailable.
-3. Add an event.
+3. Add an event, then edit its attendees and weather.
 4. Stop Streamlit completely and start it again.
-5. Confirm the item, photo, availability state, and event remain present.
+5. Confirm the item, photo, availability state, event edits, and weather edits remain present.
 6. Generate a valid plan and choose **Save family plan**.
 7. Open **Events** and confirm the plan appears under **Saved family plans**.
 8. Mark one of its wardrobe items unavailable and choose **Review and replan**.
 9. Generate the replacement and confirm the comparison lists changed and preserved outfits.
 10. Restart Streamlit and reopen the saved plan from **Events**.
+11. Delete an event, confirm the warning, restart Streamlit, and verify the event does not return.

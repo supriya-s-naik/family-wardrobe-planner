@@ -80,6 +80,76 @@ def test_event_action_scopes_plan_and_empty_selection_is_disabled():
     assert app.button[0].disabled
 
 
+def test_event_attendees_and_weather_can_be_edited_and_persisted():
+    app = start()
+    app.radio(key="page").set_value("Events").run()
+    app.button(key="edit_event_coastal_outing").click().run()
+
+    app.multiselect(key="edit_event_participants_event_coastal_outing").set_value(
+        ["member_maya", "member_arjun"]
+    ).run()
+    app.text_input(key="edit_weather_condition_event_coastal_outing").set_value(
+        "warm and sunny"
+    ).run()
+    app.number_input(key="edit_weather_high_event_coastal_outing").set_value(74).run()
+    app.number_input(key="edit_weather_rain_event_coastal_outing").set_value(0).run()
+    app.button(
+        key="FormSubmitter:edit_event_form_event_coastal_outing-Save changes"
+    ).click().run()
+
+    assert not app.exception
+    assert any("was updated" in message.value for message in app.success)
+    assert any("Maya, Arjun" in block.value for block in app.markdown)
+    assert any("Warm And Sunny" in caption.value for caption in app.caption)
+
+    restarted_app = start()
+    restarted_app.radio(key="page").set_value("Events").run()
+    restarted_app.button(key="edit_event_coastal_outing").click().run()
+
+    assert restarted_app.multiselect(
+        key="edit_event_participants_event_coastal_outing"
+    ).value == ["member_maya", "member_arjun"]
+    assert (
+        restarted_app.text_input(key="edit_weather_condition_event_coastal_outing").value
+        == "warm and sunny"
+    )
+    assert restarted_app.number_input(key="edit_weather_high_event_coastal_outing").value == 74
+    assert restarted_app.number_input(key="edit_weather_rain_event_coastal_outing").value == 0
+
+    planning_app = start()
+    planning_app.radio(key="page").set_value("Events").run()
+    planning_app.button(key="plan_event_coastal_outing").click().run()
+    planning_app.radio[1].set_value("Demo-safe local").run()
+    planning_app.button(key="generate_plan").click().run(timeout=15)
+    planning_app = await_plan(planning_app)
+
+    planned_member_ids = {
+        outfit["member_id"]
+        for outfit in planning_app.session_state["planning_state"]["final_result"]["outfits"]
+    }
+    assert planned_member_ids == {"member_maya", "member_arjun"}
+
+
+def test_event_deletion_requires_confirmation_and_survives_restart():
+    app = start()
+    app.radio(key="page").set_value("Events").run()
+    app.button(key="delete_event_school_celebration").click().run()
+
+    assert app.button(key="confirm_delete_event_school_celebration")
+    assert app.button(key="cancel_delete_event_school_celebration")
+    app.button(key="confirm_delete_event_school_celebration").click().run()
+
+    assert not app.exception
+    assert any("was deleted" in message.value for message in app.success)
+    assert all(button.key != "plan_event_school_celebration" for button in app.button)
+
+    restarted_app = start()
+    restarted_app.radio(key="page").set_value("Events").run()
+    assert not restarted_app.exception
+    assert all(button.key != "plan_event_school_celebration" for button in restarted_app.button)
+    assert all(button.key != "edit_event_school_celebration" for button in restarted_app.button)
+
+
 def test_intake_buttons_open_prototype_forms():
     wardrobe_app = start()
     wardrobe_app.radio(key="page").set_value("Wardrobe").run()
